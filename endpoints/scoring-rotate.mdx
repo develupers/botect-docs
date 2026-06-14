@@ -1,0 +1,92 @@
+---
+title: "POST /v1/projects/{project}/scoring/rotate"
+description: "Rotate a project's site key or private key. The old key is invalidated immediately and a new one is returned."
+---
+
+Issues a fresh **site key** or **private key** for a project and invalidates the previous one immediately — use it after a suspected leak, or to retrieve a private key you didn't store. Scoring must already be enabled.
+
+```http
+POST https://api.botect.ai/v1/projects/{project}/scoring/rotate
+```
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. The project must belong to the token's account. See [Authentication](/authentication).
+
+## Path parameters
+
+<ParamField path="project" param-type="integer" required="true">
+  The project ID.
+</ParamField>
+
+## Body
+
+<ParamField body="type" param-type="string" required="true">
+  Which key to rotate: `site` or `private`.
+</ParamField>
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl -X POST https://api.botect.ai/v1/projects/123/scoring/rotate \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "type": "private" }'
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/projects/123/scoring/rotate', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.BOTECT_TOKEN}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ type: 'private' }),
+});
+const { key } = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.post(
+    "https://api.botect.ai/v1/projects/123/scoring/rotate",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+    json={"type": "private"},
+)
+key = r.json()["key"]
+```
+</Request>
+
+<Response show-lines="true" tabs="200">
+```json
+{
+  "type": "private",
+  "key": "sk_7dN…"
+}
+```
+</Response>
+
+## Response fields
+
+<ResponseField name="type" field-type="string" required="true">
+  The key type that was rotated (`site` or `private`).
+</ResponseField>
+
+<ResponseField name="key" field-type="string" required="true">
+  The new key. For `private`, this is your only chance to capture it.
+</ResponseField>
+
+<Callout kind="alert">
+  Rotation is immediate: in-flight requests using the old key start failing with <code>401</code> as soon as the new key is issued. Deploy the new key before (or as) you rotate.
+</Callout>
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad account token |
+| `403` | — | Project does not belong to the token's account |
+| `409` | — | Scoring is not enabled — [enable](/endpoints/scoring-enable) it first |
+| `422` | `INVALID_PAYLOAD` | `type` missing or not `site`/`private` |

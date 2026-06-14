@@ -1,0 +1,101 @@
+---
+title: "Introduction"
+description: "Botect scores every visitor session for bot-likelihood from behavioral, JS, and heuristic signals — then tells your backend whether to allow, challenge, or block, in under 50 ms."
+---
+
+Botect is a bot-detection API. A lightweight browser SDK streams privacy-safe interaction signals to Botect; Botect scores each session for how human it looks; and your backend reads a single **verdict** — allow, challenge, or block — from the edge of every request you care about.
+
+There are two halves to the API:
+
+- **The data plane** — high-volume, latency-critical, and never rate-limited. Your SDK posts signals to [`POST /v1/events`](/endpoints/events); your backend reads decisions from [`GET /v1/sessions/{token}/verdict`](/endpoints/verdict).
+- **The control plane** — owner-facing configuration. Enable scoring on a project, tune toggles and the bot threshold, and compose custom rules.
+
+## Key features
+
+<Columns cols="2">
+  <Card title="Session scoring" href="/how-scoring-works" icon="shield" horizontal="false">
+    A 1–99 bot-likelihood score per session from three independent engines, combined by strongest evidence.
+  </Card>
+
+  <Card title="Behavioral signals" href="/signals" icon="radar" horizontal="false">
+    Mouse entropy, scroll velocity, visibility, and input timing — the core differentiator, not just headers.
+  </Card>
+
+  <Card title="Fast verdicts" href="/endpoints/verdict" icon="zap" horizontal="false">
+    Redis-cached reads under 50 ms p99. Your site never blocks on a Botect lookup — the verdict fails open.
+  </Card>
+
+  <Card title="Observe first" href="/score-bands" icon="eye" horizontal="false">
+    Enforcement is off by default. Watch real traffic, then opt into challenge or block when you're ready.
+  </Card>
+
+  <Card title="Custom rules" href="/rules" icon="filter" horizontal="false">
+    A safe, composable expression grammar over every signal field. Compiled to an AST, never <code>eval</code>'d.
+  </Card>
+
+  <Card title="Verified bots" href="/verified-bots" icon="circle-check" horizontal="false">
+    Real search and AI crawlers are recognized and allowed — never blocked for looking automated.
+  </Card>
+</Columns>
+
+## How it works
+
+<Steps>
+  <Step title="Enable scoring" icon="power" title-type="p">
+    Turn scoring on for a project and receive a **site key** (`pk_…`) and a **private key** (`sk_…`).
+  </Step>
+
+  <Step title="Collect signals" icon="radar" title-type="p">
+    The browser SDK posts interaction batches to `POST /v1/events` with your site key. Ingest never waits on scoring.
+  </Step>
+
+  <Step title="Score asynchronously" icon="shield" title-type="p">
+    Botect combines heuristic, JS-detection, and behavioral signals into a score, band, and reasons — off the request path.
+  </Step>
+
+  <Step title="Read the verdict" icon="shield-check" title-type="p">
+    Your backend calls `GET /v1/sessions/{token}/verdict` with your private key and gets an `action`: allow, challenge, or block.
+  </Step>
+
+  <Step title="Decide" icon="check" title-type="p">
+    Toggles and your custom rules resolve the action. Unknown or not-yet-scored sessions fail open to <code>allow</code>.
+  </Step>
+</Steps>
+
+## Conventions
+
+- **Base URL:** `https://api.botect.ai/v1`
+- **Data-plane auth:** site key for ingest (`X-Botect-Site-Key: pk_…`), private key for verdicts (`Authorization: Bearer sk_…`)
+- **Control-plane auth:** an account API token (`Authorization: Bearer <token>`)
+- **Format:** JSON in, JSON out (`Content-Type: application/json` on `POST`/`PUT` bodies)
+- **HTTPS only:** plain HTTP is not accepted
+- **Versioning:** the URL prefix is `v1`. Breaking changes ship behind a new version
+- **No client rate limiting** on the data plane — volume is governed by your monthly quota, not by `429`s
+
+## Explore Botect
+
+<Columns cols="2">
+  <Card title="Quickstart" href="/quickstart" icon="play" horizontal="true">
+    Enable scoring and read your first verdict in a few minutes.
+  </Card>
+
+  <Card title="Authentication" href="/authentication" icon="key" horizontal="true">
+    The three credential types and where each one is used.
+  </Card>
+
+  <Card title="How scoring works" href="/how-scoring-works" icon="shield" horizontal="true">
+    Engines, the combiner, detection IDs, and reasons.
+  </Card>
+
+  <Card title="Rules" href="/rules" icon="filter" horizontal="true">
+    Compose decisions over signal fields with a safe grammar.
+  </Card>
+
+  <Card title="API Reference" href="/endpoints/events" icon="code" horizontal="true">
+    Full reference for every endpoint, parameter, and response.
+  </Card>
+
+  <Card title="Release notes" href="/changelog" icon="history" horizontal="true">
+    What's new and what changed.
+  </Card>
+</Columns>

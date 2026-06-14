@@ -1,0 +1,61 @@
+---
+title: "GET /user"
+description: "Return the authenticated user for an account API token. A quick way to verify a token works."
+---
+
+Returns the user the account API token authenticates as. The simplest way to confirm a token is valid.
+
+```http
+GET https://api.botect.ai/user
+```
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. See [Authentication](/authentication).
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl https://api.botect.ai/user \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/user', {
+  headers: { Authorization: `Bearer ${process.env.BOTECT_TOKEN}` },
+});
+const user = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.get(
+    "https://api.botect.ai/user",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+)
+user = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="200,401">
+```json
+{
+  "id": 42,
+  "name": "Ada Lovelace",
+  "email": "ada@example.com",
+  "created_at": "2026-01-01T00:00:00Z"
+}
+```
+
+```json
+{
+  "error": "Authentication required",
+  "message": "Unauthenticated.",
+  "code": "UNAUTHENTICATED"
+}
+```
+</Response>
+
+A valid token returns `200` with the user object; a bad or missing token returns `401`. To inspect the **account** the token acts on, use [Account context](/endpoints/account).

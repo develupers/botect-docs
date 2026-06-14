@@ -1,0 +1,73 @@
+---
+title: "Errors"
+description: "Botect's stable JSON error shape, status codes, and the cases that are deliberately not errors."
+---
+
+Every API error returns a stable JSON shape so your client can switch on the machine-readable `code`. The `code` never changes without a major-version bump; `error` and `message` are human copy and may be reworded.
+
+## Error shape
+
+```json
+{
+  "error": "Short title (stable)",
+  "message": "Human-readable detail (may change with copy)",
+  "code": "STABLE_MACHINE_CODE",
+  "details": { },
+  "retry_after": 0
+}
+```
+
+`details` and `retry_after` are optional and only present where relevant.
+
+## Status codes
+
+| Status | `code` | Meaning |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing, malformed, or revoked credential — or a site/private key for a project without scoring enabled |
+| `402` | `NO_ACTIVE_SUBSCRIPTION` | Valid credential, but the owning account has no active subscription |
+| `403` | `FEATURE_NOT_AVAILABLE` | The account's plan does not include the requested feature |
+| `422` | `INVALID_PAYLOAD` | Schema violation — malformed batch, non-whitelisted payload keys, or an invalid rule expression |
+
+## Canonical 402
+
+```json
+{
+  "error": "No active subscription",
+  "message": "This account has no active subscription. Subscribe to a plan to access the API.",
+  "code": "NO_ACTIVE_SUBSCRIPTION"
+}
+```
+
+## What is *not* an error
+
+Two cases that might look like failures are deliberately successful responses — this is what keeps Botect off your critical path:
+
+<Callout kind="info">
+  <strong>Unknown or not-yet-scored session.</strong> A verdict read for a session Botect hasn't scored (or doesn't recognize) returns <code>200</code> with a fail-open body — <code>not_computed</code>, score <code>0</code>, action <code>allow</code> — not a <code>404</code>. This also avoids leaking which session tokens exist.
+</Callout>
+
+```json
+{
+  "verdict": "not_computed",
+  "score": 0,
+  "action": "allow",
+  "detection_ids": [],
+  "reason": "Score not available; allowing by default."
+}
+```
+
+<Callout kind="info">
+  <strong>Over-quota ingest.</strong> Crossing your monthly quota does not error. The batch is accepted (<code>202</code>) and may carry <code>"over_quota": true</code>. See <a href="/plans-quotas">Plans &amp; quotas</a>.
+</Callout>
+
+## No 429
+
+The data plane is **never rate-limited**. There is no `429` and no `Retry-After` on ingest or verdict reads — volume is governed by quota, and under load the verdict path fails open. See [Plans & quotas](/plans-quotas).
+
+## Handling errors
+
+- Switch on `code`, not on `error`/`message` text.
+- Treat `401` as a credential problem — check you're sending the right key for the endpoint (see [Authentication](/authentication)).
+- Treat `402` as "subscribe / renew", surfaced to an account owner.
+- Treat `422` on rule creation as a grammar problem — the `message` describes which token or field was rejected.
+- For verdict reads, you generally don't need error handling on the happy path: unknown sessions and load both resolve to a safe `allow`.

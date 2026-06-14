@@ -1,0 +1,100 @@
+{
+  "name": "Botect API",
+  "initialRoute": "introduction",
+  "logo-light": "/logo/botect-logo-light.svg",
+  "logo-dark": "/logo/botect-logo-dark.svg",
+  "favicon": "/logo/botect-favicon.svg",
+  "colors": {
+    "light": {
+      "brand": "#0051fe"
+    },
+    "dark": {
+      "brand": "#4d82ff"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "icon": "rocket",
+            "expandable": false,
+            "pages": [
+              { "title": "Introduction", "path": "introduction", "icon": "star" },
+              { "title": "Quickstart", "path": "quickstart", "icon": "play" },
+              { "title": "Authentication", "path": "authentication", "icon": "key" }
+            ]
+          },
+          {
+            "group": "Core concepts",
+            "icon": "compass",
+            "expandable": false,
+            "pages": [
+              { "title": "How scoring works", "path": "how-scoring-works", "icon": "shield" },
+              { "title": "Signals & fields", "path": "signals", "icon": "radar" },
+              { "title": "Score bands", "path": "score-bands", "icon": "gauge" },
+              { "title": "Rules", "path": "rules", "icon": "filter" },
+              { "title": "Verified bots", "path": "verified-bots", "icon": "circle-check" }
+            ]
+          },
+          {
+            "group": "Operations",
+            "icon": "settings",
+            "expandable": false,
+            "pages": [
+              { "title": "Plans & quotas", "path": "plans-quotas", "icon": "layers" },
+              { "title": "Errors", "path": "errors", "icon": "alert-triangle" }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Data plane",
+            "icon": "activity",
+            "expandable": false,
+            "pages": [
+              { "title": "Ingest events", "path": "endpoints/events", "icon": "upload" },
+              { "title": "Get verdict", "path": "endpoints/verdict", "icon": "shield-check" }
+            ]
+          },
+          {
+            "group": "Configuration",
+            "icon": "sliders",
+            "expandable": false,
+            "pages": [
+              { "title": "Enable scoring", "path": "endpoints/scoring-enable", "icon": "power" },
+              { "title": "Rotate a key", "path": "endpoints/scoring-rotate", "icon": "refresh-cw" },
+              { "title": "Update settings", "path": "endpoints/scoring-settings", "icon": "toggle-right" },
+              { "title": "List rules", "path": "endpoints/rules-list", "icon": "list" },
+              { "title": "Create a rule", "path": "endpoints/rules-create", "icon": "plus" },
+              { "title": "Delete a rule", "path": "endpoints/rules-delete", "icon": "trash" }
+            ]
+          },
+          {
+            "group": "Account",
+            "icon": "user",
+            "expandable": false,
+            "pages": [
+              { "title": "Current user", "path": "endpoints/user", "icon": "user" },
+              { "title": "Account context", "path": "endpoints/account", "icon": "building" }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "icon": "clock",
+        "pages": [
+          { "title": "Release notes", "path": "changelog", "icon": "history" }
+        ]
+      }
+    ]
+  }
+}

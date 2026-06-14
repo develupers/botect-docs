@@ -1,0 +1,75 @@
+---
+title: "GET /v1/account"
+description: "Return the account an API token acts on, plus the caller's role. Reachable without an active subscription."
+---
+
+Returns the account the API token is bound to, and the authenticated user's role within it. Reachable **without** an active subscription, so a no-plan account can still introspect itself.
+
+```http
+GET https://api.botect.ai/v1/account
+```
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. The account is resolved from the token's immutable binding; a broken binding fails closed with `403` rather than silently resolving to another account. See [Authentication](/authentication).
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl https://api.botect.ai/v1/account \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/account', {
+  headers: { Authorization: `Bearer ${process.env.BOTECT_TOKEN}` },
+});
+const account = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.get(
+    "https://api.botect.ai/v1/account",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+)
+account = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="200,403">
+```json
+{
+  "id": 9,
+  "name": "Acme Inc",
+  "slug": "acme",
+  "is_personal": false,
+  "role": "owner"
+}
+```
+
+```json
+{
+  "error": "Forbidden",
+  "message": "The API token is not bound to an accessible account.",
+  "code": "FORBIDDEN"
+}
+```
+</Response>
+
+## Response fields
+
+<ResponseField name="id" field-type="integer" required="true">The account ID.</ResponseField>
+<ResponseField name="name" field-type="string" required="true">The account name.</ResponseField>
+<ResponseField name="slug" field-type="string" required="true">URL-safe account slug.</ResponseField>
+<ResponseField name="is_personal" field-type="boolean" required="true">Whether this is a personal account.</ResponseField>
+<ResponseField name="role" field-type="string | null" required="true">The authenticated user's role in the account (e.g. `owner`, `member`).</ResponseField>
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad account token |
+| `403` | — | The token is not bound to an accessible account |

@@ -1,0 +1,116 @@
+---
+title: "PUT /v1/projects/{project}/scoring/settings"
+description: "Update a project's enforcement toggles and bot threshold. Changes bust the verdict cache so they take effect promptly."
+---
+
+Updates the project's enforcement toggles and the likely-bot threshold. This is the **90% control surface** — most tuning happens here, without writing rules. Changes bust the verdict cache so they take effect within the cache window.
+
+```http
+PUT https://api.botect.ai/v1/projects/{project}/scoring/settings
+```
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. The project must belong to the token's account. See [Authentication](/authentication).
+
+## Path parameters
+
+<ParamField path="project" param-type="integer" required="true">
+  The project ID.
+</ParamField>
+
+## Body
+
+All fields are optional — send only what you want to change.
+
+<ParamField body="allow_verified" param-type="boolean">
+  Verified bots → `allow`, regardless of score. Default `true`.
+</ParamField>
+
+<ParamField body="protect_static" param-type="boolean">
+  When `false`, static-resource requests are skipped (`allow`). Default `true`.
+</ParamField>
+
+<ParamField body="block_definite" param-type="boolean">
+  When `true`, band `definite` → `block`. Default `false`.
+</ParamField>
+
+<ParamField body="challenge_likely" param-type="boolean">
+  When `true`, band `likely_automated` → `challenge`. Default `false`.
+</ParamField>
+
+<ParamField body="likely_bot_threshold" param-type="integer">
+  The bot/human boundary `T`, `1`–`99`. Default `30`. Higher is more suspicious.
+</ParamField>
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl -X PUT https://api.botect.ai/v1/projects/123/scoring/settings \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "block_definite": true,
+    "challenge_likely": true,
+    "likely_bot_threshold": 40
+  }'
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/projects/123/scoring/settings', {
+  method: 'PUT',
+  headers: {
+    Authorization: `Bearer ${process.env.BOTECT_TOKEN}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ block_definite: true, challenge_likely: true }),
+});
+const settings = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.put(
+    "https://api.botect.ai/v1/projects/123/scoring/settings",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+    json={"block_definite": True, "challenge_likely": True, "likely_bot_threshold": 40},
+)
+settings = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="200">
+```json
+{
+  "bot_settings": {
+    "allow_verified": true,
+    "protect_static": true,
+    "block_definite": true,
+    "challenge_likely": true
+  },
+  "likely_bot_threshold": 40
+}
+```
+</Response>
+
+## Response fields
+
+<ResponseField name="bot_settings" field-type="object" required="true">
+  The project's toggles after the update.
+</ResponseField>
+
+<ResponseField name="likely_bot_threshold" field-type="integer" required="true">
+  The threshold `T` after the update.
+</ResponseField>
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad account token |
+| `403` | — | Project does not belong to the token's account |
+| `422` | `INVALID_PAYLOAD` | A toggle is non-boolean or `likely_bot_threshold` is out of range |
+
+See [Score bands](/score-bands) for how these settings drive the verdict action.

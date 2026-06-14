@@ -1,0 +1,42 @@
+---
+title: "Release notes"
+description: "What's new in the Botect API — features, behavior changes, and improvements, newest first."
+---
+
+<Callout kind="tip">
+  Subscribe to changes by watching the [`botect-docs`](https://gitlab.com/develupers/botect-docs) repo. Every release update lands here as a commit.
+</Callout>
+
+<Update label="2026-06-14" description="v1" tags={["Launch"]}>
+  ## v1 API is live
+
+  The first release of the Botect bot-detection API. A two-plane design under `/v1`: a never-rate-limited data plane for ingest and verdicts, and an account-scoped control plane for configuration.
+
+  **Data plane:**
+
+  - `POST /v1/events` — ingest privacy-safe interaction signals (site-key auth, async-scored, idempotent)
+  - `GET /v1/sessions/{token}/verdict` — read a session's decision (private-key auth, Redis-cached, fails open)
+
+  **Control plane:**
+
+  - `POST /v1/projects/{project}/scoring` — enable scoring, mint site + private keys
+  - `POST /v1/projects/{project}/scoring/rotate` — rotate a site or private key
+  - `PUT /v1/projects/{project}/scoring/settings` — toggles + bot threshold
+  - `GET|POST|DELETE /v1/projects/{project}/rules` — custom rule CRUD
+  - `GET /user`, `GET /v1/account` — identity & account context
+
+  **Scoring:**
+
+  - Three independent engines — heuristics, JS detection (non-enforcing), behavioral — combined by strongest evidence into a 1–99 score (`0` = not computed)
+  - Stable detection IDs and plain-English reasons on every bot-banded verdict
+  - Verified-bot allowlist with category, short-circuited to `allow` by default
+  - Safe rule grammar compiled to an AST — never `eval`'d
+
+  **Defaults:**
+
+  - **Observe-first** — `block_definite` and `challenge_likely` start off, so enabling scoring never breaks legitimate traffic
+  - Likely-bot threshold `T = 30`
+  - Verdict cache TTL 60s, busted on rescore and on any toggle/rule change
+
+  See [How scoring works](/how-scoring-works) for the engine model and [Plans & quotas](/plans-quotas) for how ingest volume is metered.
+</Update>

@@ -1,0 +1,54 @@
+---
+title: "Verified bots"
+description: "How Botect recognizes legitimate search and AI crawlers and allows them by default — so good bots are never blocked for looking automated."
+---
+
+Not every bot is hostile. Search engines, AI crawlers, uptime monitors, and link previewers are bots you *want* visiting your site. Botect maintains a **verified-bot allowlist** so these are recognized and allowed — never caught by enforcement meant for abusive automation.
+
+## How verification works
+
+A session is marked `verified_bot` only on **actual verification** — never on a user-agent claim alone (anyone can send `Googlebot` in their UA). When a session matches the allowlist, the combiner short-circuits:
+
+- `verified_bot` → `true`
+- `verified_bot_category` → the bot's category (e.g. `Search`, `AI Crawler`, `AI Search`)
+- `band` → `verified`
+- bot banding is **skipped** entirely
+
+## Allowing verified bots
+
+The `allow_verified` toggle is **on by default**. With it on, any verified bot resolves to `allow` as the very first step of [verdict resolution](/score-bands#resolution-order) — before rules and other toggles. This is almost always what you want.
+
+```json
+{ "allow_verified": true }
+```
+
+<Callout kind="info">
+  Verified-bot handling runs <strong>first</strong>. A <code>block_definite</code> toggle or a low-score rule won't catch a verified crawler while <code>allow_verified</code> is on.
+</Callout>
+
+## Acting on verified bots
+
+If you *do* want to treat some verified bots differently — say, challenge AI crawlers on a paid section — you have two levers:
+
+- Turn `allow_verified` **off** to stop the blanket short-circuit, then let rules and toggles decide.
+- Write a [rule](/rules) that matches on `verified_bot` / `verified_bot_category`:
+
+```text
+verified_bot AND verified_bot_category == "AI Crawler" AND path == "/premium"
+→ block
+```
+
+<Callout kind="tip">
+  When <code>allow_verified</code> is on, your enforcement rules should include <code>AND NOT verified_bot</code> so a broad rule never accidentally targets a crawler you rely on for indexing.
+</Callout>
+
+## Using it in rules
+
+`verified_bot` (bool) and `verified_bot_category` (string) are both [rule-usable signal fields](/signals):
+
+```text
+NOT verified_bot AND score < 30        → block        # bots only, never crawlers
+verified_bot_category in ["Search"]    → allow         # always let search engines through
+```
+
+The verified-bot list is maintained from public crawler registries and refreshed periodically, so newly-announced legitimate crawlers are recognized without any change on your side.

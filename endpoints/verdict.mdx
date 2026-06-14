@@ -1,0 +1,124 @@
+---
+title: "GET /v1/sessions/{session_token}/verdict"
+description: "Read the bot-detection decision for a session. Authenticated by private key, Redis-cached, fails open, under 50 ms p99."
+---
+
+Your backend calls this from request middleware to decide what to do with a visitor. Authenticated by the **private key** (secret). Cached in Redis and **fails open** — your site never hard-breaks on a Botect lookup.
+
+```http
+GET https://api.botect.ai/v1/sessions/{session_token}/verdict
+```
+
+## Authentication
+
+Private key via `Authorization: Bearer sk_…` (or the `X-Botect-Private-Key` header). The session must belong to the authenticated project; if not, it's treated as unknown and returns the fail-open body (not a `404`, which would leak existence). See [Authentication](/authentication).
+
+```http
+Authorization: Bearer sk_YOUR_PRIVATE_KEY
+```
+
+## Path parameters
+
+<ParamField path="session_token" param-type="string" required="true">
+  The session token your SDK obtained from [ingest](/endpoints/events) (typically read from the `botect_session` cookie).
+</ParamField>
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl https://api.botect.ai/v1/sessions/sess_9f3c.../verdict \
+  -H "Authorization: Bearer sk_YOUR_PRIVATE_KEY"
+```
+
+```javascript
+const res = await fetch(
+  `https://api.botect.ai/v1/sessions/${sessionToken}/verdict`,
+  { headers: { Authorization: `Bearer ${process.env.BOTECT_PRIVATE_KEY}` } },
+);
+const { action } = await res.json();
+if (action === 'block') return reject();
+if (action === 'challenge') return showChallenge();
+```
+
+```python
+import os, requests
+
+r = requests.get(
+    f"https://api.botect.ai/v1/sessions/{session_token}/verdict",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_PRIVATE_KEY']}"},
+)
+v = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="200 human,200 bot,200 fail-open">
+```json
+{
+  "verdict": "likely_human",
+  "score": 87,
+  "action": "allow",
+  "detection_ids": [],
+  "reason": "No bot signals; natural interaction profile."
+}
+```
+
+```json
+{
+  "verdict": "definite",
+  "score": 8,
+  "action": "block",
+  "detection_ids": [50331648, 50331651],
+  "reason": "Headless automation signature; no human interaction recorded."
+}
+```
+
+```json
+{
+  "verdict": "not_computed",
+  "score": 0,
+  "action": "allow",
+  "detection_ids": [],
+  "reason": "Score not available; allowing by default."
+}
+```
+</Response>
+
+## Response fields
+
+<ResponseField name="verdict" field-type="string" required="true">
+  The score band: `not_computed`, `definite`, `likely_automated`, `likely_human`, or `verified`. See [Score bands](/score-bands).
+</ResponseField>
+
+<ResponseField name="score" field-type="integer" required="true">
+  `0` (not computed) or `1`–`99`, where lower is more bot-confident.
+</ResponseField>
+
+<ResponseField name="action" field-type="string" required="true">
+  What to do: `allow`, `challenge`, `block`, `log`, or `delay`. Resolved from rules + toggles. **Branch on this**, not on `score`.
+</ResponseField>
+
+<ResponseField name="detection_ids" field-type="integer[]" required="true">
+  Stable IDs explaining the score. Empty for clean humans; populated for bot-banded or enforced verdicts.
+</ResponseField>
+
+<ResponseField name="reason" field-type="string" required="true">
+  Plain-English summary of the decision.
+</ResponseField>
+
+## Caching & fail-open
+
+- Cached per `project` + `session_token` (default TTL 60s). The cache is busted on rescore and whenever a toggle or rule changes.
+- An **unknown / not-yet-scored session, or any load error, returns the fail-open `200` body** (`not_computed`, score `0`, action `allow`). Your site continues to serve traffic even if Botect is degraded.
+- A blocking resolution records a block (with score, reason, and detection IDs) for audit.
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad private key |
+| `402` | `NO_ACTIVE_SUBSCRIPTION` | Owning account has no active subscription |
+
+<Callout kind="info">
+  An <strong>unknown session is not an error</strong> — it returns the fail-open <code>200</code> above. There is <strong>no <code>429</code></strong>: the verdict path is never rate-limited and fails open under load.
+</Callout>

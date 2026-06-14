@@ -1,0 +1,79 @@
+---
+title: "How scoring works"
+description: "Three independent engines turn a session's signals into a single 1–99 bot-likelihood score, combined by strongest evidence, with stable detection IDs and plain-English reasons."
+---
+
+Botect scores a **session**, not a single request. As signals arrive at [`POST /v1/events`](/endpoints/events), Botect (asynchronously, off your request path) runs them through independent engines and combines the results into one score, a band, a set of detection IDs, and a human-readable reason.
+
+## The score scale
+
+The score is an integer on a **1–99** scale where **lower means more bot-confident**:
+
+- `1` — definite bot (strongest evidence)
+- `99` — strongly human
+- `0` — **not computed** (sentinel). A session with no signals yet, or a degraded lookup. `0` is never conflated with `1`.
+
+A project-level **threshold** `T` (default `30`) draws the line between bot and human bands. See [Score bands](/score-bands).
+
+## The engines
+
+Engines are independent and layered — not voted. Each emits an optional score, detection IDs, and reasons, or abstains.
+
+| Engine | Looks at | Emits |
+|---|---|---|
+| **Heuristics** | Header-shape fingerprint, user-agent patterns, ASN / network origin | Hard low scores on known-bot matches |
+| **JS detection** | `navigator`/automation/headless tells, capability mismatches | A `js_detection.passed` signal — **non-enforcing** |
+| **Behavioral** | Mouse entropy, scroll velocity, visibility changes, first-input delay | A graded score from how human the interaction looks |
+
+<Callout kind="info">
+  JS detection is **non-enforcing**: a failed JS probe alone can never push the final score into a bot band. It's a contributing signal, not a verdict. Headless browsers that behave like humans still need behavioral evidence to be flagged.
+</Callout>
+
+A TLS-fingerprint engine arrives in a future version without changing this interface.
+
+## Combining results
+
+The combiner (`ScoreCombiner`) resolves the engines' opinions into one result:
+
+<Steps>
+  <Step title="Verified short-circuit" icon="circle-check" title-type="p">
+    If the session matches a known [verified bot](/verified-bots), set <code>verified_bot = true</code> with its category, band <code>verified</code>, and skip bot banding.
+  </Step>
+
+  <Step title="Sentinel" icon="circle-dashed" title-type="p">
+    If no engine has an opinion, the score is <code>0</code> (not computed) — never <code>1</code>.
+  </Step>
+
+  <Step title="Strongest evidence" icon="trending-down" title-type="p">
+    The final score is the <strong>minimum</strong> of the engines' scores — the most bot-confident wins.
+  </Step>
+
+  <Step title="JS guard" icon="shield" title-type="p">
+    A JS-detection-only negative cannot, by itself, drop the score below the threshold <code>T</code>.
+  </Step>
+
+  <Step title="Reasons & band" icon="message-square" title-type="p">
+    Union the detection IDs, compose the reason from their templates, and classify the band against <code>T</code>.
+  </Step>
+</Steps>
+
+## Detection IDs and reasons
+
+Every score in a **bot band** — and every blocking or challenging verdict — carries at least one **detection ID** and a reason. Detection IDs are stable integers from a fixed registry, so you can match on them in [rules](/rules) and they won't shift under you.
+
+A clean human score may carry an empty `detection_ids` array with a generic reason ("nothing flagged").
+
+```json
+{
+  "score": 14,
+  "verdict": "definite",
+  "detection_ids": [50331648, 50331651],
+  "reason": "Headless automation signature; no human interaction recorded."
+}
+```
+
+## Recomputation
+
+Scoring runs in a background job after ingest, debounced per session so a burst of batches coalesces into one recompute. Each recompute writes the new score, band, detection IDs, and reason — and busts the [verdict](/endpoints/verdict) cache so the next read reflects it.
+
+Because scoring is asynchronous, a freshly-minted session may briefly read as `not_computed` (score `0`, action `allow`) until its first score lands.

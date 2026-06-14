@@ -1,0 +1,147 @@
+---
+title: "Quickstart"
+description: "Enable scoring on a project, stream signals from the browser, and read your first verdict from your backend."
+---
+
+This walks through the full loop: enable scoring, send signals, read a decision. You'll need an [account API token](/authentication) and a project.
+
+## 1. Enable scoring
+
+Turn scoring on for a project. This mints your **site key** (`pk_…`, public) and **private key** (`sk_…`, secret — shown only once).
+
+<CodeGroup tabs="cURL,JavaScript,Python">
+```bash
+curl -X POST https://api.botect.ai/v1/projects/123/scoring \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/projects/123/scoring', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${process.env.BOTECT_TOKEN}` },
+});
+const { site_key, private_key } = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.post(
+    "https://api.botect.ai/v1/projects/123/scoring",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+)
+keys = r.json()  # {"site_key": "pk_…", "private_key": "sk_…", …}
+```
+</CodeGroup>
+
+<Callout kind="alert">
+  The `private_key` is returned **once**, on first enablement. Store it in a secrets manager immediately — if you lose it, [rotate](/endpoints/scoring-rotate) to get a new one.
+</Callout>
+
+## 2. Stream signals from the browser
+
+The browser SDK posts batches of privacy-safe interaction signals to the ingest endpoint, authenticated by your **site key**. On first contact `session_token` is `null`; Botect mints one and returns it for the SDK to reuse.
+
+```bash
+curl -X POST https://api.botect.ai/v1/events \
+  -H "X-Botect-Site-Key: pk_YOUR_SITE_KEY" \
+  -H "Idempotency-Key: 6f1c…batch-uuid" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_token": null,
+    "events": [
+      {
+        "request_id": "a1b2…event-uuid",
+        "type": "mouse",
+        "received_at": "2026-06-14T10:00:00Z",
+        "payload": { "entropy": 0.74, "samples": 128 }
+      }
+    ]
+  }'
+```
+
+The response carries the minted `session_token`:
+
+```json
+{ "session_token": "sess_9f…", "accepted": 1, "duplicates": 0 }
+```
+
+Scoring runs **asynchronously** — the score is not in this response. See [Ingest events](/endpoints/events) for the payload vocabulary and idempotency rules.
+
+## 3. Read the verdict from your backend
+
+In your request middleware, look up the session's verdict with your **private key**. Use the `session_token` your SDK stored (typically from a cookie).
+
+<CodeGroup tabs="cURL,JavaScript,Python">
+```bash
+curl https://api.botect.ai/v1/sessions/sess_9f.../verdict \
+  -H "Authorization: Bearer sk_YOUR_PRIVATE_KEY"
+```
+
+```javascript
+const res = await fetch(
+  `https://api.botect.ai/v1/sessions/${sessionToken}/verdict`,
+  { headers: { Authorization: `Bearer ${process.env.BOTECT_PRIVATE_KEY}` } },
+);
+const { action, score, verdict } = await res.json();
+if (action === 'block') return reject();
+if (action === 'challenge') return showChallenge();
+```
+
+```python
+import os, requests
+
+r = requests.get(
+    f"https://api.botect.ai/v1/sessions/{session_token}/verdict",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_PRIVATE_KEY']}"},
+)
+v = r.json()  # {"verdict": "likely_human", "score": 87, "action": "allow", …}
+```
+</CodeGroup>
+
+A typical response:
+
+```json
+{
+  "verdict": "likely_human",
+  "score": 87,
+  "action": "allow",
+  "detection_ids": [],
+  "reason": "No bot signals; natural interaction profile."
+}
+```
+
+<Callout kind="tip">
+  Branch on `action`, not on `score`. The action already folds in your toggles, threshold, and rules — and an unknown or not-yet-scored session returns `action: "allow"` (fail-open) so your site never hard-breaks.
+</Callout>
+
+## 4. Turn on enforcement when you're ready
+
+Botect ships **observe-first**: `block_definite` and `challenge_likely` are off by default, so enabling scoring never breaks legitimate traffic. Watch your sessions, then opt in:
+
+```bash
+curl -X PUT https://api.botect.ai/v1/projects/123/scoring/settings \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "block_definite": true, "challenge_likely": true }'
+```
+
+## Next steps
+
+<Columns cols="2">
+  <Card title="How scoring works" href="/how-scoring-works" icon="shield" horizontal="true">
+    What the engines look at and how the score is formed.
+  </Card>
+
+  <Card title="Rules" href="/rules" icon="filter" horizontal="true">
+    Go beyond toggles with custom expressions.
+  </Card>
+
+  <Card title="Plans & quotas" href="/plans-quotas" icon="layers" horizontal="true">
+    How ingest volume is metered and what happens over quota.
+  </Card>
+
+  <Card title="Errors" href="/errors" icon="alert-triangle" horizontal="true">
+    Error format and status codes.
+  </Card>
+</Columns>

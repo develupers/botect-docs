@@ -1,0 +1,89 @@
+---
+title: "Score bands"
+description: "How the 1–99 score maps to bands relative to your project threshold, and how toggles turn bands into allow / challenge / block actions."
+---
+
+A raw score is precise but hard to act on. Botect classifies each score into a **band** relative to your project's threshold `T`, and your enforcement **toggles** map bands to actions. This keeps the decision surface simple: most customers never touch a raw number.
+
+## The bands
+
+| Band | Score range | Meaning |
+|---|---|---|
+| `not_computed` | `0` | No signals yet, or a degraded lookup. Always allowed (fail-open). |
+| `definite` | `1` | Strongest bot evidence. |
+| `likely_automated` | `2` … `T-1` | Below the threshold — probably a bot. |
+| `likely_human` | `T` … `99` | At or above the threshold — probably human. |
+| `verified` | — | A recognized [verified bot](/verified-bots); set by short-circuit, independent of score. |
+
+The threshold `T` (default `30`) is a project setting. Raising it makes Botect more suspicious (more sessions land in `likely_automated`); lowering it is more permissive.
+
+## Toggles: bands → actions
+
+Toggles are the **90% control surface** — four booleans on the project's `bot_settings`. They default to **observe-first**, so enabling scoring never breaks legitimate traffic before you opt in.
+
+```json
+{
+  "allow_verified": true,
+  "protect_static": true,
+  "block_definite": false,
+  "challenge_likely": false
+}
+```
+
+| Toggle | Default | Effect |
+|---|---|---|
+| `allow_verified` | `true` | Verified bots → `allow`, regardless of score |
+| `protect_static` | `true` | When `false`, static-resource requests are skipped (`allow`) |
+| `block_definite` | `false` | When `true`, band `definite` → `block` |
+| `challenge_likely` | `false` | When `true`, band `likely_automated` → `challenge` |
+
+The resulting band → action mapping, when no rule has already terminated:
+
+| Band | Toggle | Action |
+|---|---|---|
+| `verified` | `allow_verified` on | `allow` |
+| `definite` | `block_definite` on | `block` |
+| `likely_automated` | `challenge_likely` on | `challenge` |
+| `likely_human` / others | — | `allow` |
+
+<Callout kind="info">
+  Enforcement toggles (<code>block_definite</code>, <code>challenge_likely</code>) ship <strong>off</strong>. Enable scoring, watch real traffic land in bands, and turn enforcement on only when the bands look right for your site.
+</Callout>
+
+Change a toggle or the threshold via [Update settings](/endpoints/scoring-settings); the change busts the verdict cache so it takes effect within the cache window.
+
+## Resolution order
+
+When your backend reads a verdict, the action is resolved in this order — the first match wins:
+
+<Steps>
+  <Step title="Verified short-circuit" icon="circle-check" title-type="p">
+    Verified bot + <code>allow_verified</code> on → <code>allow</code>.
+  </Step>
+  <Step title="Static-resource skip" icon="file" title-type="p">
+    Static resource + <code>protect_static</code> off → <code>allow</code>.
+  </Step>
+  <Step title="Rules" icon="filter" title-type="p">
+    Active <a href="/rules">rules</a> in order; the first terminating action (<code>block</code>/<code>challenge</code>) wins.
+  </Step>
+  <Step title="Toggles" icon="toggle-right" title-type="p">
+    Band → action via the toggle mapping above.
+  </Step>
+  <Step title="Default" icon="check" title-type="p">
+    <code>allow</code>.
+  </Step>
+</Steps>
+
+## Actions
+
+The `action` returned in a verdict is one of the `BotAction` values:
+
+| Action | Meaning |
+|---|---|
+| `allow` | Let the request through |
+| `challenge` | Interpose a challenge (e.g. CAPTCHA / interstitial) |
+| `block` | Reject the request |
+| `log` | Record only — no enforcement (available to rules) |
+| `delay` | Apply a soft delay (available to rules) |
+
+Toggles only ever emit `allow`, `challenge`, or `block`. `log` and `delay` are available when you write custom [rules](/rules).

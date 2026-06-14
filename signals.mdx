@@ -1,0 +1,47 @@
+---
+title: "Signals & fields"
+description: "The composable signal fields exposed on a scored session — what they mean, their types, and which are usable in custom rules."
+---
+
+A scored session exposes a vocabulary of **signal fields**. They surface in the [verdict](/endpoints/verdict) response (where applicable) and are the fields you compose [rules](/rules) over. The vocabulary tracks well-known bot-management mental models so they port cleanly.
+
+Adding a field is always **additive** — existing rules keep working when new signals ship.
+
+## Field reference
+
+| Field | Type | Source | Rule-usable | Notes |
+|---|---|---|---|---|
+| `score` | int `0` or `1`–`99` | combiner | ✅ | `0` = not computed (sentinel), never the same as `1` |
+| `band` | enum | banding | ✅ | `not_computed \| definite \| likely_automated \| likely_human \| verified` |
+| `verified_bot` | bool | verified-bot match | ✅ | True only on real verification — never a UA claim alone |
+| `verified_bot_category` | string \| null | verified-bot match | ✅ | e.g. `Search`, `AI Crawler`, `AI Search` |
+| `detection_ids` | int[] | engines | ✅ (`in` / `not in`) | Stable IDs from the detection registry |
+| `js_detection.passed` | bool \| null | JS-detection engine | ✅ | **Non-enforcing** — a `false` never alone forces a bot verdict |
+| `static_resource` | bool | request classification | ✅ | Asset / extension / `.well-known` detection |
+| `behavioral.mouse_entropy` | float `0`–`1` | behavioral engine | ✅ | Randomness of pointer movement; humans trend high |
+| `behavioral.scroll_velocity` | float (px/s) | behavioral engine | ✅ | Scroll speed profile |
+| `behavioral.visibility_changes` | int | behavioral engine | ✅ | Tab/visibility transitions observed |
+| `behavioral.first_input_delay_ms` | int | behavioral engine | ✅ | Time to first genuine interaction |
+| `path` | string | request context | ✅ | Request path, e.g. `/login` |
+| `ip` | string | request context | ✅ | Request IP |
+| `country` | string | request context | ✅ | ISO country code |
+| `ua` | string | request context | ✅ | User-agent string |
+| `session_token` | string | server-minted | ❌ | Identifier, not a scoring input |
+| `ja4` | string \| null | trusted edge header | ✅ (v2) | **Null in v1** — no v1 engine reads it yet |
+
+## The behavioral signals
+
+The `behavioral.*` aggregates are Botect's core differentiator — they describe *how* a session interacts, which is far harder to spoof than headers or user-agent strings. They're the fields you'll most often build rules over:
+
+- **`mouse_entropy`** — humans move pointers in noisy, non-linear paths (high entropy); scripted clicks are jumpy or perfectly straight (low entropy).
+- **`scroll_velocity`** — natural scrolling has variable, decaying velocity; automation tends toward uniform or instantaneous jumps.
+- **`visibility_changes`** — real users switch tabs and windows; many bots never do.
+- **`first_input_delay_ms`** — humans take time to orient before acting; automation often fires immediately.
+
+<Callout kind="tip">
+  Behavioral signals accumulate as a session sends more events. A session with very few events may not yet have enough behavioral evidence to leave the <code>not_computed</code> band.
+</Callout>
+
+## Privacy
+
+Ingest stores **no PII**. Event payloads are whitelisted per event type to aggregates only (entropy, velocities, counts, timings) — raw inputs, content, and identifying data are rejected at the door with a `422`. See [Ingest events](/endpoints/events).

@@ -1,0 +1,106 @@
+---
+title: "POST /v1/projects/{project}/scoring"
+description: "Enable bot scoring on a project and mint its site key and private key. The private key is returned once."
+---
+
+Turns scoring on for a project and mints the data-plane credentials: a **site key** (`pk_…`, public) and a **private key** (`sk_…`, secret). Idempotent — calling it again while already enabled returns the existing site key and a `null` private key (Botect only stores the private key's hash, so it can't re-show it).
+
+```http
+POST https://api.botect.ai/v1/projects/{project}/scoring
+```
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. The project must belong to the token's account. Reachable **without** an active subscription, so you can configure a project before subscribing. See [Authentication](/authentication).
+
+## Path parameters
+
+<ParamField path="project" param-type="integer" required="true">
+  The project ID to enable scoring on.
+</ParamField>
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl -X POST https://api.botect.ai/v1/projects/123/scoring \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/projects/123/scoring', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${process.env.BOTECT_TOKEN}` },
+});
+const { site_key, private_key } = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.post(
+    "https://api.botect.ai/v1/projects/123/scoring",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+)
+keys = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="201,201 already enabled">
+```json
+{
+  "site_key": "pk_2bX…",
+  "private_key": "sk_9aQ…",
+  "bot_settings": {
+    "allow_verified": true,
+    "protect_static": true,
+    "block_definite": false,
+    "challenge_likely": false
+  },
+  "likely_bot_threshold": 30
+}
+```
+
+```json
+{
+  "site_key": "pk_2bX…",
+  "private_key": null,
+  "bot_settings": {
+    "allow_verified": true,
+    "protect_static": true,
+    "block_definite": false,
+    "challenge_likely": false
+  },
+  "likely_bot_threshold": 30
+}
+```
+</Response>
+
+## Response fields
+
+<ResponseField name="site_key" field-type="string" required="true">
+  The public site key (`pk_…`) for [ingest](/endpoints/events).
+</ResponseField>
+
+<ResponseField name="private_key" field-type="string | null" required="true">
+  The secret private key (`sk_…`) for [verdict reads](/endpoints/verdict) — returned **only on first enablement**. `null` if scoring was already enabled; [rotate](/endpoints/scoring-rotate) to get a new one.
+</ResponseField>
+
+<ResponseField name="bot_settings" field-type="object" required="true">
+  The project's enforcement toggles (observe-first defaults). See [Score bands](/score-bands).
+</ResponseField>
+
+<ResponseField name="likely_bot_threshold" field-type="integer" required="true">
+  The bot/human boundary `T` (default `30`).
+</ResponseField>
+
+<Callout kind="alert">
+  Store the <code>private_key</code> immediately — it is shown once and cannot be recovered, only rotated.
+</Callout>
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad account token |
+| `403` | — | Project does not belong to the token's account |

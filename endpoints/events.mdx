@@ -1,0 +1,166 @@
+---
+title: "POST /v1/events"
+description: "Ingest a batch of privacy-safe interaction signals for a session. Authenticated by site key, async-scored, idempotent, never rate-limited."
+---
+
+The browser SDK posts batches of signals here. Authenticated by the **site key** (public). Scoring runs asynchronously — the score is not in the response; read it from the [verdict](/endpoints/verdict) endpoint.
+
+```http
+POST https://api.botect.ai/v1/events
+```
+
+## Authentication
+
+Site key via the `X-Botect-Site-Key` header (preferred) or a `site_key` body field. The key's project must have scoring enabled and the owning account must have an active subscription. See [Authentication](/authentication).
+
+```http
+X-Botect-Site-Key: pk_YOUR_SITE_KEY
+```
+
+## Idempotency
+
+Pass an `Idempotency-Key: <uuid>` header per batch. On first contact (no `session_token`), Botect stores it so a retry of the same batch resolves to the **same** session instead of minting a new one. Combined with per-event `request_id` de-duplication, this guarantees retries never double-count — even if the first `202` is lost.
+
+```http
+Idempotency-Key: 6f1c…batch-uuid
+```
+
+## Request body
+
+<ParamField body="session_token" param-type="string | null" required="true">
+  The session's token, or `null` on first contact. When null (or unrecoverable), Botect mints one and returns it.
+</ParamField>
+
+<ParamField body="events" param-type="array" required="true">
+  The batch of signal events. Each entry:
+  <Expandable title="event">
+    <ParamField body="request_id" param-type="string" required="true">
+      A UUID unique to this event. Used to de-duplicate within the session.
+    </ParamField>
+    <ParamField body="type" param-type="string" required="true">
+      One of `mouse`, `scroll`, `visibility`, `first_input`, `js_probe`, `page`.
+    </ParamField>
+    <ParamField body="received_at" param-type="string (ISO 8601)" required="true">
+      When the event was observed client-side.
+    </ParamField>
+    <ParamField body="payload" param-type="object" required="true">
+      Whitelisted, non-PII aggregates only — keys are validated per `type`. Unknown or PII-shaped keys are rejected with `422`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl -X POST https://api.botect.ai/v1/events \
+  -H "X-Botect-Site-Key: pk_YOUR_SITE_KEY" \
+  -H "Idempotency-Key: 6f1c0e2a-batch-uuid" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_token": null,
+    "events": [
+      {
+        "request_id": "a1b2c3d4-event-uuid",
+        "type": "mouse",
+        "received_at": "2026-06-14T10:00:00Z",
+        "payload": { "entropy": 0.74, "samples": 128 }
+      }
+    ]
+  }'
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/events', {
+  method: 'POST',
+  headers: {
+    'X-Botect-Site-Key': SITE_KEY,
+    'Idempotency-Key': batchUuid,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    session_token: sessionToken, // null on first contact
+    events: [
+      {
+        request_id: eventUuid,
+        type: 'mouse',
+        received_at: new Date().toISOString(),
+        payload: { entropy: 0.74, samples: 128 },
+      },
+    ],
+  }),
+});
+const { session_token } = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.post(
+    "https://api.botect.ai/v1/events",
+    headers={
+        "X-Botect-Site-Key": os.environ["BOTECT_SITE_KEY"],
+        "Idempotency-Key": batch_uuid,
+    },
+    json={
+        "session_token": None,
+        "events": [{
+            "request_id": event_uuid,
+            "type": "mouse",
+            "received_at": "2026-06-14T10:00:00Z",
+            "payload": {"entropy": 0.74, "samples": 128},
+        }],
+    },
+)
+data = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="202,202 over quota">
+```json
+{
+  "session_token": "sess_9f3c…",
+  "accepted": 1,
+  "duplicates": 0
+}
+```
+
+```json
+{
+  "session_token": "sess_9f3c…",
+  "accepted": 1,
+  "duplicates": 0,
+  "over_quota": true
+}
+```
+</Response>
+
+## Response fields
+
+<ResponseField name="session_token" field-type="string" required="true">
+  The session's token. Newly minted if the request sent `null`; the SDK should store it (typically in the `botect_session` cookie) and reuse it.
+</ResponseField>
+
+<ResponseField name="accepted" field-type="integer" required="true">
+  How many events in the batch were newly recorded.
+</ResponseField>
+
+<ResponseField name="duplicates" field-type="integer" required="true">
+  How many events were recognized as duplicates (by `request_id`) and not re-counted.
+</ResponseField>
+
+<ResponseField name="over_quota" field-type="boolean">
+  Present and `true` when the account has crossed its monthly quota. The batch is still accepted. See [Plans & quotas](/plans-quotas).
+</ResponseField>
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad site key, or scoring not enabled |
+| `402` | `NO_ACTIVE_SUBSCRIPTION` | Owning account has no active subscription |
+| `422` | `INVALID_PAYLOAD` | Schema violation, non-whitelisted payload key, or over-size batch |
+
+<Callout kind="info">
+  There is <strong>no <code>429</code></strong>. The customer's ingest traffic is never rate-limited — over-quota is soft (above) and overload is handled server-side by sampling/shedding. A malformed batch is rejected whole; there is no partial ingest.
+</Callout>

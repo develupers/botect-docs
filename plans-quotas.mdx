@@ -1,0 +1,52 @@
+---
+title: "Plans & quotas"
+description: "How Botect meters ingest volume against a monthly quota — and why the data plane is never rate-limited."
+---
+
+Botect's data plane is built around one principle: **your traffic is never throttled.** Neither ingest nor verdict reads return `429`. Instead, ingest volume is metered against a **monthly quota** tied to your subscription, and Botect protects itself under load with sampling and shedding — not by throttling you.
+
+## No rate limiting
+
+A bot-detection product sits on your hot path. Rate-limiting your verdict reads would mean *Botect* breaks *your* site under traffic — exactly backwards. So:
+
+- **Verdict reads** ([`GET …/verdict`](/endpoints/verdict)) are never rate-limited. Under Botect's own load they **fail open** (`allow`, score `0`), never `429`.
+- **Ingest** ([`POST /v1/events`](/endpoints/events)) is never rate-limited. Volume is governed by your monthly quota; bursts are absorbed server-side.
+
+There is no `429` and no `Retry-After` on the data plane.
+
+## Monthly quota
+
+Each plan includes a monthly allotment of metered ingest. `IngestEventAction` meters consumption against your account's quota as batches arrive. The quota resets each billing month.
+
+Over-quota is **soft**: the batch is still accepted (`202`) and metered — it is never rejected or `429`'d. The ingest response may carry an `over_quota` flag so your SDK or operator can surface an upgrade prompt:
+
+```json
+{ "session_token": "sess_9f…", "accepted": 5, "duplicates": 1, "over_quota": true }
+```
+
+<Callout kind="info">
+  Exact over-quota handling (sample-down, flag-for-overage, or stop scoring new sessions) is a billing-policy decision for your plan. In all cases ingest keeps returning <code>202</code> — your site never breaks because you crossed a quota line.
+</Callout>
+
+## Server-side load protection
+
+Under Botect's own load — not yours — ingest may be:
+
+- **Sampled** — a fraction of batches are scored; the effective sample rate is recorded so session counts stay interpretable.
+- **Shed** — a batch returns a fast non-error (`202`/`204`) and the SDK degrades silently.
+
+This is Botect's operational protection, transparent to your users, and never a per-customer throttle.
+
+## Subscription requirement
+
+Both data-plane endpoints require the **owning account to have an active subscription**. With no plan, ingest and verdict return:
+
+```json
+{
+  "error": "No active subscription",
+  "message": "This account has no active subscription. Subscribe to a plan to access the API.",
+  "code": "NO_ACTIVE_SUBSCRIPTION"
+}
+```
+
+with status `402`. Note that you can [enable scoring](/endpoints/scoring-enable) and configure a project **before** subscribing — only the live data plane is entitlement-gated. See [Errors](/errors).

@@ -1,0 +1,85 @@
+---
+title: "Rules"
+description: "Go beyond toggles with a safe, composable boolean grammar over every signal field — compiled to an AST, never eval'd."
+---
+
+Toggles cover the common case. **Rules** cover the rest: when you want a decision to depend on a specific path, country, detection ID, or behavioral threshold, you write a rule. A rule is a boolean expression over [signal fields](/signals) plus an action to take when it matches.
+
+Rules are evaluated **before** toggles in the [resolution order](/score-bands#resolution-order): the first active rule that matches and carries a terminating action (`block`/`challenge`) wins, and its name appears in the verdict `reason`.
+
+## Safety
+
+Rule expressions are a **constrained grammar**, not code. At save time each expression is parsed and validated into an abstract syntax tree (AST); the verdict path walks the stored AST. There is no `eval`, no method calls, no code execution — an invalid or out-of-grammar expression is rejected with a `422` when you create the rule, never at evaluation time.
+
+## Grammar
+
+```text
+expr      := orExpr
+orExpr    := andExpr ( "OR" andExpr )*
+andExpr   := unary  ( "AND" unary )*
+unary     := "NOT" unary | "(" expr ")" | predicate
+predicate := comparison | boolField
+comparison:= field op value
+boolField := verified_bot | js_detection.passed | static_resource   (bare truthiness)
+op        := "==" | "!=" | "<" | "<=" | ">" | ">=" | "in" | "not in"
+value     := number | "quoted string" | "[" list "]" | true | false | null
+```
+
+### Allow-listed fields
+
+`score`, `band`, `verified_bot`, `verified_bot_category`, `js_detection.passed`, `static_resource`, `detection_ids`, `path`, `ip`, `country`, `ua`, `behavioral.mouse_entropy`, `behavioral.scroll_velocity`, `behavioral.visibility_changes`, `behavioral.first_input_delay_ms`.
+
+Any field outside this list is rejected. See [Signals & fields](/signals) for each field's meaning and type.
+
+### Operators by type
+
+| Field type | Fields | Operators |
+|---|---|---|
+| Numeric | `score`, `behavioral.*` | `== != < <= > >=` |
+| Boolean | `verified_bot`, `js_detection.passed`, `static_resource` | `== !=` (or bare) |
+| String | `path`, `country`, `ua`, `verified_bot_category`, `band` | `== != in not in` |
+| Array | `detection_ids` | `in` / `not in` (membership) |
+
+## Examples
+
+```text
+score < 30 AND path == "/login" AND NOT verified_bot
+→ block
+
+detection_ids in [50331648, 50331651] AND NOT verified_bot
+→ block
+
+band == "likely_automated" AND country in ["RU", "CN"]
+→ challenge
+
+behavioral.mouse_entropy < 0.2 AND behavioral.visibility_changes == 0
+→ challenge
+```
+
+## Creating a rule
+
+Send the expression text and an action. Botect compiles and validates it before storing.
+
+```bash
+curl -X POST https://api.botect.ai/v1/projects/123/rules \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Protect login from bots",
+    "expression": "score < 30 AND path == \"/login\" AND NOT verified_bot",
+    "action": "block",
+    "sort_order": 10
+  }'
+```
+
+See [Create a rule](/endpoints/rules-create) for the full request and response. Rules are listed in `sort_order` (ascending) and evaluated in that order.
+
+<Callout kind="tip">
+  Always guard enforcement rules with <code>AND NOT verified_bot</code> unless you specifically intend to act on verified crawlers — otherwise a misconfigured rule could block Google or an AI crawler you want indexing your site.
+</Callout>
+
+## Evaluation
+
+When a verdict is read, active rules run in `sort_order`. The first rule whose expression matches and whose action is **terminating** (`block`/`challenge`) wins; `log`/`delay`/`allow` actions follow their own semantics and may not stop evaluation. The matched rule populates the verdict `reason` (and the recorded block) so you can always trace *why* a request was acted on.
+
+Changing a rule busts the project's verdict cache so it takes effect within the cache window.

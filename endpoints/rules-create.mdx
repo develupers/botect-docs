@@ -1,0 +1,125 @@
+---
+title: "POST /v1/projects/{project}/rules"
+description: "Create a custom bot rule. The expression is compiled and validated to a safe AST before it's stored."
+---
+
+Creates a custom [rule](/rules). The `expression` is parsed and validated into a safe AST at save time — an invalid or out-of-grammar expression is rejected with `422` here, never at evaluation time.
+
+```http
+POST https://api.botect.ai/v1/projects/{project}/rules
+```
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. The project must belong to the token's account. See [Authentication](/authentication).
+
+## Path parameters
+
+<ParamField path="project" param-type="integer" required="true">
+  The project ID.
+</ParamField>
+
+## Body
+
+<ParamField body="name" param-type="string" required="true">
+  Human-readable label. Surfaces in the verdict `reason` when the rule matches.
+</ParamField>
+
+<ParamField body="expression" param-type="string" required="true">
+  A boolean expression in the [rule grammar](/rules#grammar) over allow-listed signal fields.
+</ParamField>
+
+<ParamField body="action" param-type="string" required="true">
+  What to do when the rule matches: `block`, `challenge`, `allow`, `log`, or `delay`.
+</ParamField>
+
+<ParamField body="is_active" param-type="boolean">
+  Whether the rule is evaluated. Default `true`.
+</ParamField>
+
+<ParamField body="sort_order" param-type="integer">
+  Evaluation order (ascending). Default `0`.
+</ParamField>
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl -X POST https://api.botect.ai/v1/projects/123/rules \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Protect login from bots",
+    "expression": "score < 30 AND path == \"/login\" AND NOT verified_bot",
+    "action": "block",
+    "sort_order": 10
+  }'
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/projects/123/rules', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.BOTECT_TOKEN}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'Protect login from bots',
+    expression: 'score < 30 AND path == "/login" AND NOT verified_bot',
+    action: 'block',
+    sort_order: 10,
+  }),
+});
+const rule = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.post(
+    "https://api.botect.ai/v1/projects/123/rules",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+    json={
+        "name": "Protect login from bots",
+        "expression": 'score < 30 AND path == "/login" AND NOT verified_bot',
+        "action": "block",
+        "sort_order": 10,
+    },
+)
+rule = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="201,422 bad expression">
+```json
+{
+  "id": 7,
+  "project_id": 123,
+  "name": "Protect login from bots",
+  "expression_source": "score < 30 AND path == \"/login\" AND NOT verified_bot",
+  "action": "block",
+  "is_active": true,
+  "sort_order": 10,
+  "created_at": "2026-06-14T10:00:00Z",
+  "updated_at": "2026-06-14T10:00:00Z"
+}
+```
+
+```json
+{
+  "error": "Invalid payload",
+  "message": "Unknown field \"scorre\" in rule expression.",
+  "code": "INVALID_PAYLOAD"
+}
+```
+</Response>
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad account token |
+| `403` | — | Project does not belong to the token's account |
+| `422` | `INVALID_PAYLOAD` | Missing field, invalid `action`, or an expression with an unknown field, type/operator mismatch, unbalanced parens, or out-of-grammar token |
+
+See [Rules](/rules) for the grammar and worked examples.

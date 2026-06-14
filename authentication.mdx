@@ -1,0 +1,91 @@
+---
+title: "Authentication"
+description: "Botect uses three credentials: an account API token for configuration, a site key for ingest, and a private key for verdict reads."
+---
+
+Botect separates its **control plane** (configure scoring) from its **data plane** (send signals, read verdicts), and each uses a different credential. Picking the right one per call matters: site keys are public by design, private keys must never leave your servers.
+
+## The three credentials
+
+| Credential | Prefix | Used for | Sent as | Secrecy |
+|---|---|---|---|---|
+| **Account API token** | — | Control plane: enable scoring, settings, rules | `Authorization: Bearer <token>` | Secret (server-side) |
+| **Site key** | `pk_` | Data plane: ingest events from the browser | `X-Botect-Site-Key: pk_…` | Public (ships in the browser) |
+| **Private key** | `sk_` | Data plane: read session verdicts | `Authorization: Bearer sk_…` | Secret (server-side) |
+
+The site key and private key are minted together when you [enable scoring](/endpoints/scoring-enable) on a project. The account API token is created in the dashboard.
+
+## Account API token
+
+Used for every control-plane endpoint under `/v1/projects/{project}/…` — and for [`/user`](/endpoints/user) and [`/account`](/endpoints/account). It is scoped to your account; the project must belong to it.
+
+<Steps>
+  <Step title="Open the dashboard" icon="layout-dashboard" title-type="p">
+    Sign in to Botect and navigate to **Settings → API Tokens**.
+  </Step>
+
+  <Step title="Create a token" icon="key" title-type="p">
+    Give it a descriptive name (e.g. `ci`, `provisioning`) and submit.
+  </Step>
+
+  <Step title="Copy it immediately" icon="copy" title-type="p">
+    The full secret is shown **once**. Store it in a secrets manager.
+  </Step>
+</Steps>
+
+```bash
+curl https://api.botect.ai/v1/account \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
+```
+
+## Site key
+
+A public, project-scoped key prefixed `pk_`. It authenticates [`POST /v1/events`](/endpoints/events) — the ingest calls your browser SDK makes. Because it ships to the browser, it is **not** a secret: it can only *add* signals, never read verdicts or change configuration.
+
+```http
+X-Botect-Site-Key: pk_YOUR_SITE_KEY
+```
+
+<Callout kind="info">
+  The site key may also be sent as a `site_key` field in the request body. The header is preferred.
+</Callout>
+
+## Private key
+
+A secret, project-scoped key prefixed `sk_`. It authenticates [`GET /v1/sessions/{token}/verdict`](/endpoints/verdict) — the verdict reads your backend makes. Botect stores only a SHA-256 hash of it, so it cannot be recovered after issuance — only rotated.
+
+```http
+Authorization: Bearer sk_YOUR_PRIVATE_KEY
+```
+
+It may also be sent as `X-Botect-Private-Key`. Either works:
+
+```http
+X-Botect-Private-Key: sk_YOUR_PRIVATE_KEY
+```
+
+<Callout kind="danger">
+  Never put a private key or account token in client-side code. Only the **site key** belongs in the browser. Verdict reads and configuration must happen from your backend.
+</Callout>
+
+## Rotating keys
+
+The site and private keys can be rotated independently — for example after a suspected leak. Rotation issues a new key and immediately invalidates the old one.
+
+```bash
+curl -X POST https://api.botect.ai/v1/projects/123/scoring/rotate \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "type": "private" }'
+```
+
+See [Rotate a key](/endpoints/scoring-rotate) for details. Account API tokens are rotated by deleting and recreating them in the dashboard.
+
+## Common authentication errors
+
+| Status | `code` | Meaning |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing, malformed, or revoked credential — or a site/private key for a project without scoring enabled |
+| `402` | `NO_ACTIVE_SUBSCRIPTION` | The credential is valid but the owning account has no active subscription |
+
+See [Errors](/errors) for the full reference.
