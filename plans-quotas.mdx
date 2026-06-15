@@ -50,3 +50,21 @@ Both data-plane endpoints require the **owning account to have an active subscri
 ```
 
 with status `402`. Note that you can [enable scoring](/endpoints/scoring-enable) and configure a project **before** subscribing — only the live data plane is entitlement-gated. See [Errors](/errors).
+
+## Feature-gated endpoints
+
+Beyond the subscription gate, a few endpoints require a specific **plan feature** and return `403 FEATURE_NOT_AVAILABLE` when the plan doesn't include it:
+
+| Endpoint | Feature | Plans |
+|---|---|---|
+| [Export verified bots](/endpoints/verified-bots-export) | `verified-bots-export` | Business, Owner-lifetime |
+
+```json
+{
+  "error": "Feature not available",
+  "message": "Your plan does not include the 'verified-bots-export' feature.",
+  "code": "FEATURE_NOT_AVAILABLE"
+}
+```
+
+Upgrade the plan to unlock the feature, or check `GET /v1/account` for the caller's context.

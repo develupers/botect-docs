@@ -78,6 +78,14 @@
             ]
           },
           {
+            "group": "Reference data",
+            "icon": "database",
+            "expandable": false,
+            "pages": [
+              { "title": "Export verified bots", "path": "endpoints/verified-bots-export", "icon": "circle-check" }
+            ]
+          },
+          {
             "group": "Account",
             "icon": "user",
             "expandable": false,

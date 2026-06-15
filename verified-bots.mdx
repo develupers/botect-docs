@@ -52,3 +52,14 @@ verified_bot_category in ["Search"]    → allow         # always let search eng
 ```
 
 The verified-bot list is maintained from public crawler registries and refreshed periodically, so newly-announced legitimate crawlers are recognized without any change on your side.
+
+## Exporting the allowlist
+
+You can pull the full allowlist over the API to mirror it into your own edge (WAF, CDN, firewall) or to audit which operators Botect recognizes:
+
+```bash
+curl https://api.botect.ai/v1/verified-bots/export \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
+```
+
+Each entry carries the bot `name`, `category`, and how it's matched (`ip_cidr` or `rdns_suffix`) with the matching `match_value`. The export is available on the **Business** and **Owner-lifetime** plans and requires a token with the `projects:read` ability. See [Export verified bots](/endpoints/verified-bots-export).

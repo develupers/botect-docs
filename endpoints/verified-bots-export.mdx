@@ -1,0 +1,105 @@
+---
+title: "GET /v1/verified-bots/export"
+description: "Export the full verified-bot allowlist (CIDR and rDNS rules) as a flat JSON list. Business and Owner-lifetime plans only."
+---
+
+Returns the complete active [verified-bot](/verified-bots) allowlist — every CIDR range and reverse-DNS suffix Botect uses to recognize legitimate crawlers, monitors, and previewers. The list is a **global catalog**: every subscriber sees the same rules, not a per-account subset.
+
+Use it to mirror Botect's allowlist into your own edge (WAF, CDN, firewall) or to audit which operators are recognized.
+
+```http
+GET https://api.botect.ai/v1/verified-bots/export
+```
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. This endpoint is gated on two things:
+
+- The token must carry the **`projects:read`** [ability](/authentication#token-abilities).
+- The account's plan must include the **`verified-bots-export`** feature — currently the **Business** and **Owner-lifetime** plans.
+
+See [Authentication](/authentication) and [Plans & quotas](/plans-quotas#feature-gated-endpoints).
+
+## Example
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl https://api.botect.ai/v1/verified-bots/export \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/verified-bots/export', {
+  headers: { Authorization: `Bearer ${process.env.BOTECT_TOKEN}` },
+});
+const { data, meta } = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.get(
+    "https://api.botect.ai/v1/verified-bots/export",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+)
+payload = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="200,403">
+```json
+{
+  "data": [
+    {
+      "name": "Googlebot",
+      "category": "search",
+      "match_method": "ip_cidr",
+      "match_value": "66.249.64.0/19"
+    },
+    {
+      "name": "GPTBot",
+      "category": "ai_crawler",
+      "match_method": "ip_cidr",
+      "match_value": "20.171.206.0/24"
+    },
+    {
+      "name": "Applebot",
+      "category": "search",
+      "match_method": "rdns_suffix",
+      "match_value": ".applebot.apple.com"
+    }
+  ],
+  "meta": { "count": 3 }
+}
+```
+
+```json
+{
+  "error": "Feature not available",
+  "message": "Your plan does not include the 'verified-bots-export' feature.",
+  "code": "FEATURE_NOT_AVAILABLE"
+}
+```
+</Response>
+
+## Response fields
+
+The response is a list under `data`, with a `meta.count` total. Each entry is one allowlist rule:
+
+<ResponseField name="name" field-type="string" required="true">The bot/operator name (e.g. `Googlebot`, `GPTBot`, `UptimeRobot`).</ResponseField>
+<ResponseField name="category" field-type="string" required="true">The bot category, e.g. `search`, `ai_crawler`, `ai_search`, `monitoring`, `seo`. Surfaced on verdicts as `verified_bot_category`.</ResponseField>
+<ResponseField name="match_method" field-type="string" required="true">How a session is matched against the rule: `ip_cidr` (the client IP falls inside the CIDR range) or `rdns_suffix` (forward-confirmed reverse DNS ends with the suffix).</ResponseField>
+<ResponseField name="match_value" field-type="string" required="true">The match identity — a CIDR block (e.g. `66.249.64.0/19`) for `ip_cidr`, or a hostname suffix (e.g. `.googlebot.com`) for `rdns_suffix`.</ResponseField>
+
+<Callout kind="info">
+  The internal binary range bounds Botect uses to index <code>ip_cidr</code> rules are not exposed — <code>match_value</code> is the canonical, human-readable identity.
+</Callout>
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad account token |
+| `402` | `NO_ACTIVE_SUBSCRIPTION` | Valid token, but the account has no active subscription |
+| `403` | `FEATURE_NOT_AVAILABLE` | The account's plan does not include `verified-bots-export` (upgrade to Business) |
+| `403` | `INSUFFICIENT_TOKEN_ABILITY` | The token is not scoped with the `projects:read` ability |

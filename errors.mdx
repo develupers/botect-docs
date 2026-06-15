@@ -26,6 +26,7 @@ Every API error returns a stable JSON shape so your client can switch on the mac
 | `401` | `UNAUTHENTICATED` | Missing, malformed, or revoked credential — or a site/private key for a project without scoring enabled |
 | `402` | `NO_ACTIVE_SUBSCRIPTION` | Valid credential, but the owning account has no active subscription |
 | `403` | `FEATURE_NOT_AVAILABLE` | The account's plan does not include the requested feature |
+| `403` | `INSUFFICIENT_TOKEN_ABILITY` | The account token lacks an ability the endpoint requires (e.g. `projects:read`) |
 | `422` | `INVALID_PAYLOAD` | Schema violation — malformed batch, non-whitelisted payload keys, or an invalid rule expression |
 
 ## Canonical 402
@@ -69,5 +70,6 @@ The data plane is **never rate-limited**. There is no `429` and no `Retry-After`
 - Switch on `code`, not on `error`/`message` text.
 - Treat `401` as a credential problem — check you're sending the right key for the endpoint (see [Authentication](/authentication)).
 - Treat `402` as "subscribe / renew", surfaced to an account owner.
+- Treat `403` as an entitlement or scope gap: `FEATURE_NOT_AVAILABLE` means upgrade the plan; `INSUFFICIENT_TOKEN_ABILITY` means mint a token with the required ability.
 - Treat `422` on rule creation as a grammar problem — the `message` describes which token or field was rejected.
 - For verdict reads, you generally don't need error handling on the happy path: unknown sessions and load both resolve to a safe `allow`.

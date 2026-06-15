@@ -7,6 +7,16 @@ description: "What's new in the Botect API — features, behavior changes, and i
   Subscribe to changes by watching the [`botect-docs`](https://gitlab.com/develupers/botect-docs) repo. Every release update lands here as a commit.
 </Callout>
 
+<Update label="2026-06-15" description="v1" tags={["New endpoint"]}>
+  ## Export the verified-bot allowlist
+
+  - `GET /v1/verified-bots/export` — pull the full verified-bot allowlist (CIDR and rDNS rules) as a flat JSON list, to mirror into your own edge or audit recognized operators.
+
+  Gated on the new `verified-bots-export` plan feature (**Business** and **Owner-lifetime** plans) and the `projects:read` token [ability](/authentication#token-abilities). A token without the ability now returns `403 INSUFFICIENT_TOKEN_ABILITY`.
+
+  See [Export verified bots](/endpoints/verified-bots-export) and [Verified bots](/verified-bots#exporting-the-allowlist).
+</Update>
+
 <Update label="2026-06-14" description="v1" tags={["Launch"]}>
   ## v1 API is live
 

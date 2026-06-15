@@ -38,6 +38,18 @@ curl https://api.botect.ai/v1/account \
   -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN"
 ```
 
+### Token abilities
+
+When you create a token you choose its **abilities** — either **Full access** (a wildcard that grants everything your role permits) or a **custom** subset. Most control-plane endpoints are satisfied by any valid token, but some require a specific ability:
+
+| Ability | Grants |
+|---|---|
+| `projects:read` | Read project configuration and reference data — e.g. [export verified bots](/endpoints/verified-bots-export) |
+| `projects:write` | Create and update project scoring configuration |
+| `content:read` / `content:write` | Read / write content-tier resources |
+
+Two bounds apply at request time: the token's stored abilities are the **lower** bound, and your **current role** on the account is the **upper** bound. A wildcard token only ever grants what your role still allows — so if your role is reduced, the token's reach narrows with it. A call that needs an ability the token lacks returns `403 INSUFFICIENT_TOKEN_ABILITY`.
+
 ## Site key
 
 A public, project-scoped key prefixed `pk_`. It authenticates [`POST /v1/events`](/endpoints/events) — the ingest calls your browser SDK makes. Because it ships to the browser, it is **not** a secret: it can only *add* signals, never read verdicts or change configuration.
@@ -87,5 +99,6 @@ See [Rotate a key](/endpoints/scoring-rotate) for details. Account API tokens ar
 |---|---|---|
 | `401` | `UNAUTHENTICATED` | Missing, malformed, or revoked credential — or a site/private key for a project without scoring enabled |
 | `402` | `NO_ACTIVE_SUBSCRIPTION` | The credential is valid but the owning account has no active subscription |
+| `403` | `INSUFFICIENT_TOKEN_ABILITY` | The token lacks an ability the endpoint requires (e.g. `projects:read`) |
 
 See [Errors](/errors) for the full reference.
