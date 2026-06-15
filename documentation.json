@@ -1,9 +1,9 @@
 {
   "name": "Botect API",
   "initialRoute": "introduction",
-  "logo-light": "/logo/botect-logo-light.svg",
-  "logo-dark": "/logo/botect-logo-dark.svg",
-  "favicon": "/logo/botect-favicon.svg",
+  "logo-light": "https://www.botect.ai/images/botect-logo.svg",
+  "logo-dark": "https://www.botect.ai/images/botect-logo-white.svg",
+  "favicon": "https://www.botect.ai/favicon.svg",
   "colors": {
     "light": {
       "brand": "#0051fe"
