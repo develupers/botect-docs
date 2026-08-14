@@ -45,6 +45,7 @@
             "icon": "settings",
             "expandable": false,
             "pages": [
+              { "title": "Cloudflare enforcement", "path": "cloudflare-enforcement", "icon": "cloud" },
               { "title": "Plans & quotas", "path": "plans-quotas", "icon": "layers" },
               { "title": "Errors", "path": "errors", "icon": "alert-triangle" }
             ]

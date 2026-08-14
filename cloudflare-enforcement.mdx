@@ -1,0 +1,130 @@
+---
+title: "Cloudflare enforcement"
+description: "Push the IPs your rules flag straight into your own Cloudflare account, so bots are blocked at the edge before they ever reach your origin."
+---
+
+Scoring tells you *which* visitors are automated. Enforcement acts on it. Connect your Cloudflare account and Botect keeps two IP lists in sync with the IPs your active rules flag; two WAF custom rules in your zone match against those lists and block or challenge at the edge.
+
+**Botect is never in the request path.** Your traffic goes to Cloudflare, not to us. If Botect were unreachable, the lists already on Cloudflare keep enforcing exactly as they were at the last sync.
+
+## The three stages
+
+Enforcement is a chain, and every link has to hold. The Integrations page in your project mirrors these three stages, each with its own live status.
+
+<Steps>
+  <Step title="Connection" icon="key" title-type="p">
+    A scoped API token you create in Cloudflare, stored encrypted. It lets Botect maintain the IP lists and (optionally) the WAF rules.
+  </Step>
+
+  <Step title="Denial list sync" icon="refresh-cw" title-type="p">
+    Botect derives the denial list from your active rules and pushes it into two IP lists in your Cloudflare account, on a cadence you choose.
+  </Step>
+
+  <Step title="Edge enforcement" icon="shield" title-type="p">
+    Two WAF custom rules in your zone reference those lists. Botect can create and maintain them, or you can paste them in yourself.
+  </Step>
+</Steps>
+
+## Creating the API token
+
+In the Cloudflare account that owns the zone you're protecting, go to **My Profile → API Tokens → Create Token → Custom token** and add two policies:
+
+| Scope | Permission | Why |
+| --- | --- | --- |
+| Specified domains — *your zone* | **Zone WAF Rules: Edit** | Create, verify, and repair the two custom rules |
+| Specified domains — *your zone* | **Zone: Read** | List your zones for the zone picker |
+| Entire account | **Account Rule Lists: Edit** | Maintain the two IP lists |
+
+<Callout kind="info">
+  Cloudflare's newer dashboard labels these differently from the API. <strong>Account Filter Lists</strong> appears as <strong>Account Rule Lists</strong>, and it only shows up under an <strong>Entire Account</strong> policy — IP lists live on the account, not on a zone. <code>Edit</code> already implies read, so no separate read permission is needed.
+</Callout>
+
+Restrict the zone policy to the specific zone you're protecting rather than *All zones*, and prefer a non-expiring token — a token that expires silently stops enforcement from being updated.
+
+<Callout kind="tip">
+  Protect the zone that serves your <strong>site</strong>. If you run Botect-monitored traffic on one domain and have look-alike domains parked in the same account, only the zone actually serving requests needs the rules.
+</Callout>
+
+A **list-only** token (Account Rule Lists: Edit alone) also works. Botect will keep your lists in sync, and you create the two WAF rules yourself from the Manual tab.
+
+## How the denial list is derived
+
+The list is not "every bot we've ever seen." It is computed from your project's **active** rules, and only from rules that can be honored at the edge:
+
+<Steps>
+  <Step title="Edge-enforceable rules only" icon="filter" title-type="p">
+    An IP list is request-blind — it knows nothing about path, user agent, or country. So only rules whose expression references the <code>band</code> field <strong>exclusively</strong> are used. A rule like <code>band == "definite" AND path == "/login"</code> still works for live verdicts, but cannot be expressed as an IP list.
+  </Step>
+
+  <Step title="Aggregate by IP" icon="layers" title-type="p">
+    Sessions in the rolling window are grouped per IP, excluding verified bots entirely.
+  </Step>
+
+  <Step title="Threshold and classify" icon="gauge" title-type="p">
+    IPs with enough flagged sessions are assigned to the block or challenge list by the worst matching action.
+  </Step>
+
+  <Step title="Human-safety guard" icon="user-check" title-type="p">
+    Any IP that has shown a <strong>genuine human</strong> in the window is downgraded to challenge — never hard-blocked. Shared IPs and carrier NAT are the reason this exists.
+  </Step>
+</Steps>
+
+<Callout kind="alert">
+  If your rules are all inactive, the denial list is <strong>empty</strong> and a successful sync pushes zero IPs. Enforcement follows your active rules — activate one on the Rules page before expecting anything at the edge.
+</Callout>
+
+Verified bots are never listed, at any stage. See [verified bots](/verified-bots) for how that allowlist works.
+
+## Syncing
+
+Botect pushes deltas — added and removed IPs — rather than rewriting the lists. Pick a cadence in **Scoring settings → Enforcement** (from every 5 minutes up to weekly, or off for manual-only), or hit **Sync now** at any time.
+
+Every sync also reconciles drift: it re-reads what is actually in Cloudflare and corrects out-of-band edits, so a list someone emptied by hand repopulates on the next run.
+
+Cloudflare caps custom-list items account-wide (10,000 on non-Enterprise plans). If your denial list exceeds the cap, the sync status reads **capped** and block entries are kept first — the highest-confidence IPs, ordered deterministically so the retained subset is stable between syncs rather than an arbitrary slice.
+
+## The WAF rules
+
+Two custom rules do the enforcing, and they work on every Cloudflare plan (they use `starts_with`, not the Business-and-above `matches` operator):
+
+```text
+Block rule      → action: Block
+(ip.src in $botect_block_p1)
+
+Challenge rule  → action: Managed Challenge
+(ip.src in $botect_challenge_p1)
+```
+
+Botect appends them **after** any custom rules you already have, so your own rules keep their precedence.
+
+### Managed vs manual
+
+On the **Automatic** tab, pick your zone and Botect creates both rules, then verifies them on every sync:
+
+- **Drifted** — you edited a managed rule in Cloudflare. Botect freezes it and stops touching it until you resync, which overwrites your change. The Resync dialog shows an expected-vs-actual diff first.
+- **Missing** — the rule was deleted in Cloudflare. It is recreated automatically.
+
+On the **Manual** tab, Botect gives you the exact expressions to paste and never touches your rules. Switch to manual whenever you need custom behavior — the existing rules stay in place, Botect just stops verifying them.
+
+<Callout kind="tip">
+  Don't edit managed rules directly in Cloudflare. Either let Botect own them, or switch to manual and own them yourself — editing a managed rule just freezes it until the next resync.
+</Callout>
+
+### Turning enforcement off
+
+Disabling **Block** in Scoring settings flips that WAF rule's enabled switch off rather than deleting it, and the challenge rule folds the block list into its own expression — so those IPs are challenged instead of dropped. API paths are exempt by default; toggle that off to enforce on every path.
+
+## Disconnecting
+
+Disconnecting leaves your IP lists in place either way. You can optionally tick a box to also remove the WAF rules Botect created. List ids are retained, so reconnecting re-adopts the same lists instead of creating duplicates.
+
+## Self-hosting the list
+
+If you enforce somewhere other than Cloudflare, the denial list is available over the API and you can mirror it into any WAF, CDN, or firewall:
+
+```bash
+curl https://www.botect.ai/api/v1/blocklist \
+  -H "Authorization: Bearer sk_YOUR_PRIVATE_KEY"
+```
+
+It is [private-key authed](/authentication) and returns the same block and challenge sets the Cloudflare sync pushes.
