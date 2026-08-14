@@ -49,6 +49,14 @@
               { "title": "Plans & quotas", "path": "plans-quotas", "icon": "layers" },
               { "title": "Errors", "path": "errors", "icon": "alert-triangle" }
             ]
+          },
+          {
+            "group": "Troubleshooting",
+            "icon": "life-buoy",
+            "expandable": false,
+            "pages": [
+              { "title": "Cloudflare list already exists", "path": "troubleshooting/cloudflare-list-conflict", "icon": "cloud-alert" }
+            ]
           }
         ]
       },

@@ -1,0 +1,68 @@
+---
+title: "Cloudflare list already exists"
+description: "Connecting Cloudflare fails because an IP list with Botect's name is already in the account — usually left behind by another environment or a re-created project."
+---
+
+## The error
+
+Connecting Cloudflare fails with:
+
+```text
+A list named [botect_block_p1] already exists in this Cloudflare account
+but is not linked to this project.
+```
+
+The name in the brackets may be `botect_challenge_p1` instead, and the number is your project id.
+
+## Why it happens
+
+Botect names its IP lists `botect_block_p{project}` and `botect_challenge_p{project}`, and remembers the **list id** Cloudflare returned when it created them. On every later connect it re-adopts a list only when that stored id matches.
+
+A fresh connection has no stored id yet. So when a list with the expected name is already sitting in the account, Botect cannot tell whether it is:
+
+- a list **it created** from a different install — a staging or local environment, or the same project before its database was restored or rebuilt, or
+- a list **you created** that happens to share the name.
+
+Adopting the wrong one would be destructive: the next sync reconciles list contents, removing any IPs Botect did not put there. Rather than guess, it stops and asks you to decide.
+
+<Callout kind="info">
+  This is expected when you test an integration from one environment and then connect the same Cloudflare account from another. Both environments derive the same list name from the same project id.
+</Callout>
+
+## Fix it
+
+<Steps>
+  <Step title="Disconnect the old environment first" icon="unplug" title-type="p">
+    If the environment that created the lists is still reachable, open its **Integrations** page and click **Disconnect**, ticking *"Also remove the WAF rules Botect created"*. That clears the rules for you and leaves nothing to clean up by hand — skip to the last step.
+  </Step>
+
+  <Step title="Delete the leftover WAF rules" icon="shield-x" title-type="p">
+    In the Cloudflare dashboard, open the zone you are protecting, go to **Security → WAF → Custom rules** (**Security → Security rules** in newer dashboards) and delete any rules described *"Managed by Botect"*.
+
+    Do this **before** deleting the lists — Cloudflare refuses to delete a list that a rule still references. Removing them also stops the new connection creating a second, duplicate pair of rules.
+  </Step>
+
+  <Step title="Delete the leftover lists" icon="trash" title-type="p">
+    Go to **Manage Account → Configurations → Lists** and delete `botect_block_p{project}` and `botect_challenge_p{project}`.
+
+    Check the contents first if you are unsure. A list left by a test environment is usually empty or holds a handful of IPs; nothing is lost by deleting it, because Botect rebuilds the list from your active rules on the next sync.
+  </Step>
+
+  <Step title="Reconnect" icon="plug" title-type="p">
+    Back in Botect, connect Cloudflare again. It creates both lists fresh, records their ids, and the conflict cannot recur for this project.
+  </Step>
+</Steps>
+
+### If the list is genuinely yours
+
+If you created a list with that exact name for your own purposes, **rename yours** instead of deleting it. Botect will then create its own alongside, and your list keeps its contents and any rules referencing it.
+
+<Callout kind="alert">
+  Don't rename Botect's list to work around the error. The name is derived from the project id, so a renamed list is simply abandoned — Botect creates a new one and the stale list keeps whatever IPs it had, enforced by any rule still pointing at it.
+</Callout>
+
+## Avoiding it
+
+Point non-production environments at a **separate Cloudflare account**, or disconnect one environment before connecting the next. Two installs sharing one account and one project id will keep colliding on the same list names — and if both somehow adopt the same list, each sync overwrites the other's contents.
+
+See [Cloudflare enforcement](/cloudflare-enforcement) for how the lists, WAF rules, and sync fit together.
