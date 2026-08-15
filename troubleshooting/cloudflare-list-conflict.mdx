@@ -29,7 +29,7 @@ Adopting the wrong one would be destructive: the next sync reconciles list conte
   This is expected when you test an integration from one environment and then connect the same Cloudflare account from another. Both environments derive the same list name from the same project id.
 </Callout>
 
-## Method 1 — let Botect clean up (recommended)
+## Option 1 — let Botect clean up (recommended)
 
 Use this whenever the environment that created the lists is still reachable — a staging install, a local copy, or the same project before its database was rebuilt. Botect deletes its own rules and lists in the right order, so nothing is left to chase in the dashboard.
 
@@ -46,7 +46,7 @@ Use this whenever the environment that created the lists is still reachable — 
 
     For this error you want **both**: the lists are what the next connection collides with, so removing only the rules will not clear it. The second option unlocks once the first is ticked, because Cloudflare refuses to delete a list while a rule still references it.
 
-    Either box is disabled when there is nothing for it to act on, with the reason shown beneath it. If both are disabled, that environment owns nothing and the leftovers belong to something else — use [Method 2](#method-2-clean-up-by-hand).
+    Either box is disabled when there is nothing for it to act on, with the reason shown beneath it. If both are disabled, that environment owns nothing and the leftovers belong to something else — use [Option 2](#option-2-clean-up-by-hand).
   </Step>
 
   <Step title="Confirm" icon="trash" title-type="p">
@@ -62,7 +62,7 @@ Use this whenever the environment that created the lists is still reachable — 
   Removing the lists discards the IPs they held. That costs nothing: Botect rebuilds the list from your active rules on the next sync.
 </Callout>
 
-## Method 2 — clean up by hand {#method-2-clean-up-by-hand}
+## Option 2 — clean up by hand {#option-2-clean-up-by-hand}
 
 Use this when no Botect environment still owns the leftovers — the old install is gone, its database was rebuilt, or the lists were created by something else entirely.
 
@@ -96,6 +96,6 @@ If you created a list with that exact name for your own purposes, **rename yours
 
 Point non-production environments at a **separate Cloudflare account**. Two installs sharing one account and one project id derive the same list names, so they will keep colliding — whichever connects second hits this error, and if both ever adopted the same list, each sync would overwrite the other's contents.
 
-Failing that, disconnect one environment (Method 1, both boxes ticked) before connecting the next, so only one install owns the lists at a time.
+Failing that, disconnect one environment (Option 1, both boxes ticked) before connecting the next, so only one install owns the lists at a time.
 
 See [Cloudflare enforcement](/cloudflare-enforcement) for how the lists, WAF rules, and sync fit together.
