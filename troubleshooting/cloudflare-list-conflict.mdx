@@ -39,7 +39,12 @@ Use this whenever the environment that created the lists is still reachable — 
   </Step>
 
   <Step title="Tick both cleanup options" icon="check" title-type="p">
-    Tick **"Also remove the WAF rules Botect created"**, then **"Also delete the IP lists"** — the second unlocks once the first is ticked, because Cloudflare refuses to delete a list while a rule still references it.
+    The confirmation offers two independent choices:
+
+    1. **Also remove the WAF rules Botect created** — deletes the two custom rules, leaving the lists and their IPs in place.
+    2. **Also delete the IP lists** — deletes the rules *and* the lists.
+
+    For this error you want **both**: the lists are what the next connection collides with, so removing only the rules will not clear it. The second option unlocks once the first is ticked, because Cloudflare refuses to delete a list while a rule still references it.
 
     Either box is disabled when there is nothing for it to act on, with the reason shown beneath it. If both are disabled, that environment owns nothing and the leftovers belong to something else — use [Method 2](#method-2-clean-up-by-hand).
   </Step>

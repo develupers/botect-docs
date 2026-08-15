@@ -116,7 +116,23 @@ Disabling **Block** in Scoring settings flips that WAF rule's enabled switch off
 
 ## Disconnecting
 
-Disconnecting leaves your IP lists in place either way. You can optionally tick a box to also remove the WAF rules Botect created. List ids are retained, so reconnecting re-adopts the same lists instead of creating duplicates.
+By default, disconnecting only stops the syncing: your WAF rules and IP lists stay exactly as they are, still enforcing, and Botect keeps their ids so a reconnection re-adopts them instead of creating duplicates. Botect is never the reason your protection disappears.
+
+Two independent opt-ins let you clean up instead:
+
+| Tick | What is removed | What survives |
+| --- | --- | --- |
+| *(nothing)* | Nothing | Rules and lists keep enforcing at the edge |
+| **Also remove the WAF rules Botect created** | The two custom rules | The lists, with the IPs they hold |
+| **…and Also delete the IP lists** | The rules, then the lists | Nothing — the account is left clean |
+
+The list option unlocks only once the rule option is ticked: Cloudflare refuses to delete a list while a rule still references it, so the rules have to go first. Each option is disabled when there is nothing for it to act on — a project that never created rules, or whose lists are already gone — with the reason shown beneath it.
+
+Both are best-effort and never block the disconnect. Anything that could not be deleted is named in the result rather than reported as success, and Botect only forgets a rule or list it actually deleted, so whatever survives stays adoptable on reconnect.
+
+<Callout kind="tip">
+  Deleting the lists is the option to reach for when another environment will connect to the same Cloudflare account: leftover lists keep their names, and the next connection collides with them. See [Cloudflare list already exists](/troubleshooting/cloudflare-list-conflict).
+</Callout>
 
 ## Self-hosting the list
 
