@@ -29,13 +29,39 @@ Adopting the wrong one would be destructive: the next sync reconciles list conte
   This is expected when you test an integration from one environment and then connect the same Cloudflare account from another. Both environments derive the same list name from the same project id.
 </Callout>
 
-## Fix it
+## Method 1 — let Botect clean up (recommended)
+
+Use this whenever the environment that created the lists is still reachable — a staging install, a local copy, or the same project before its database was rebuilt. Botect deletes its own rules and lists in the right order, so nothing is left to chase in the dashboard.
 
 <Steps>
-  <Step title="Disconnect the old environment first" icon="unplug" title-type="p">
-    If the environment that created the lists is still reachable, open its **Integrations** page and click **Disconnect**, ticking *"Also remove the WAF rules Botect created"*. That clears the rules for you and leaves nothing to clean up by hand — skip to the last step.
+  <Step title="Open the old environment" icon="external-link" title-type="p">
+    Go to that environment's project → **Integrations** → step 1, **Cloudflare connection**, and click **Disconnect**.
   </Step>
 
+  <Step title="Tick both cleanup options" icon="check" title-type="p">
+    Tick **"Also remove the WAF rules Botect created"**, then **"Also delete the IP lists"** — the second unlocks once the first is ticked, because Cloudflare refuses to delete a list while a rule still references it.
+
+    Either box is disabled when there is nothing for it to act on, with the reason shown beneath it. If both are disabled, that environment owns nothing and the leftovers belong to something else — use [Method 2](#method-2-clean-up-by-hand).
+  </Step>
+
+  <Step title="Confirm" icon="trash" title-type="p">
+    Botect deletes the rules, then the lists, and reports what it removed. Anything it could not delete is named in the same message rather than reported as success, so a partial cleanup is never silent.
+  </Step>
+
+  <Step title="Reconnect the new environment" icon="plug" title-type="p">
+    Connect Cloudflare on the environment you actually want protecting. It creates both lists fresh, records their ids, and the conflict cannot recur for that project.
+  </Step>
+</Steps>
+
+<Callout kind="info">
+  Removing the lists discards the IPs they held. That costs nothing: Botect rebuilds the list from your active rules on the next sync.
+</Callout>
+
+## Method 2 — clean up by hand {#method-2-clean-up-by-hand}
+
+Use this when no Botect environment still owns the leftovers — the old install is gone, its database was rebuilt, or the lists were created by something else entirely.
+
+<Steps>
   <Step title="Delete the leftover WAF rules" icon="shield-x" title-type="p">
     In the Cloudflare dashboard, open the zone you are protecting, go to **Security → WAF → Custom rules** (**Security → Security rules** in newer dashboards) and delete any rules described *"Managed by Botect"*.
 
@@ -43,13 +69,13 @@ Adopting the wrong one would be destructive: the next sync reconciles list conte
   </Step>
 
   <Step title="Delete the leftover lists" icon="trash" title-type="p">
-    Go to **Manage Account → Configurations → Lists** and delete `botect_block_p{project}` and `botect_challenge_p{project}`.
+    Lists live at the account level, not inside a zone: go to **Manage Account → Configurations → Lists** and delete `botect_block_p{project}` and `botect_challenge_p{project}`.
 
-    Check the contents first if you are unsure. A list left by a test environment is usually empty or holds a handful of IPs; nothing is lost by deleting it, because Botect rebuilds the list from your active rules on the next sync.
+    Check the contents first if you are unsure. A list left by a test environment is usually empty or holds a handful of IPs.
   </Step>
 
   <Step title="Reconnect" icon="plug" title-type="p">
-    Back in Botect, connect Cloudflare again. It creates both lists fresh, records their ids, and the conflict cannot recur for this project.
+    Back in Botect, connect Cloudflare again. It creates both lists fresh and records their ids.
   </Step>
 </Steps>
 
@@ -63,6 +89,8 @@ If you created a list with that exact name for your own purposes, **rename yours
 
 ## Avoiding it
 
-Point non-production environments at a **separate Cloudflare account**, or disconnect one environment before connecting the next. Two installs sharing one account and one project id will keep colliding on the same list names — and if both somehow adopt the same list, each sync overwrites the other's contents.
+Point non-production environments at a **separate Cloudflare account**. Two installs sharing one account and one project id derive the same list names, so they will keep colliding — whichever connects second hits this error, and if both ever adopted the same list, each sync would overwrite the other's contents.
+
+Failing that, disconnect one environment (Method 1, both boxes ticked) before connecting the next, so only one install owns the lists at a time.
 
 See [Cloudflare enforcement](/cloudflare-enforcement) for how the lists, WAF rules, and sync fit together.
