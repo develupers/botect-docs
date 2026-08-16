@@ -7,6 +7,24 @@ Scoring tells you *which* visitors are automated. Enforcement acts on it. Connec
 
 **Botect is never in the request path.** Your traffic goes to Cloudflare, not to us. If Botect were unreachable, the lists already on Cloudflare keep enforcing exactly as they were at the last sync.
 
+## Three things, three names
+
+"Blocked" can mean three different things here, so Botect names them apart — in the dashboard and in this documentation:
+
+| Name | What it is | Where you see it |
+| --- | --- | --- |
+| **Blocklist** | The IPs Botect maintains in your Cloudflare account — one list to block, one to challenge | The **Blocklist** page |
+| **Blocked requests** | Traffic Cloudflare actually stopped | The Blocklist page, read back from Cloudflare's analytics — Botect never observes these itself |
+| **Verdicts** | Per-request decisions Botect returned to *your* server via the [verdict API](/endpoints/verdict) | The **Verdicts** page |
+
+The distinction that catches people out: the blocklist is a *policy*, not a record of events. An IP can sit on it for a week without sending a single request.
+
+Because Botect is deliberately not in the request path, it never witnesses a block. The per-IP counts on the Blocklist page are **read back from Cloudflare's analytics**, which is why they need the optional Zone Analytics permission and cover a rolling 24-hour window rather than all time.
+
+<Callout kind="info">
+  If you enforce at the edge and never call the verdict API, your Verdicts page stays empty. That is correct, not a fault: blocked traffic never reaches Botect to be decided on.
+</Callout>
+
 ## The three stages
 
 Enforcement is a chain, and every link has to hold. The Integrations page in your project mirrors these three stages, each with its own live status.
@@ -16,8 +34,8 @@ Enforcement is a chain, and every link has to hold. The Integrations page in you
     A scoped API token you create in Cloudflare, stored encrypted. It lets Botect maintain the IP lists and (optionally) the WAF rules.
   </Step>
 
-  <Step title="Denial list sync" icon="refresh-cw" title-type="p">
-    Botect derives the denial list from your active rules and pushes it into two IP lists in your Cloudflare account, on a cadence you choose.
+  <Step title="Blocklist sync" icon="refresh-cw" title-type="p">
+    Botect derives the blocklist from your active rules and pushes it into two IP lists in your Cloudflare account, on a cadence you choose.
   </Step>
 
   <Step title="Edge enforcement" icon="shield" title-type="p">
@@ -33,7 +51,12 @@ In the Cloudflare account that owns the zone you're protecting, go to **My Profi
 | --- | --- | --- |
 | Specified domains — *your zone* | **Zone WAF Rules: Edit** | Create, verify, and repair the two custom rules |
 | Specified domains — *your zone* | **Zone: Read** | List your zones for the zone picker |
+| Specified domains — *your zone* | **Zone Analytics: Read** | Read back how many requests each listed IP had stopped |
 | Entire account | **Account Rule Lists: Edit** | Maintain the two IP lists |
+
+<Callout kind="tip">
+  Zone Analytics is optional — everything enforces without it. Leave it out and the Blocklist page simply shows no per-IP counts. You can add it later by <strong>editing</strong> the existing token; the secret does not change, so nothing needs reconnecting.
+</Callout>
 
 <Callout kind="info">
   Cloudflare's newer dashboard labels these differently from the API. <strong>Account Filter Lists</strong> appears as <strong>Account Rule Lists</strong>, and it only shows up under an <strong>Entire Account</strong> policy — IP lists live on the account, not on a zone. <code>Edit</code> already implies read, so no separate read permission is needed.
@@ -47,7 +70,7 @@ Restrict the zone policy to the specific zone you're protecting rather than *All
 
 A **list-only** token (Account Rule Lists: Edit alone) also works. Botect will keep your lists in sync, and you create the two WAF rules yourself from the Manual tab.
 
-## How the denial list is derived
+## How the blocklist is derived
 
 The list is not "every bot we've ever seen." It is computed from your project's **active** rules, and only from rules that can be honored at the edge:
 
@@ -70,7 +93,7 @@ The list is not "every bot we've ever seen." It is computed from your project's 
 </Steps>
 
 <Callout kind="alert">
-  If your rules are all inactive, the denial list is <strong>empty</strong> and a successful sync pushes zero IPs. Enforcement follows your active rules — activate one on the Rules page before expecting anything at the edge.
+  If your rules are all inactive, the blocklist is <strong>empty</strong> and a successful sync pushes zero IPs. Enforcement follows your active rules — activate one on the Rules page before expecting anything at the edge.
 </Callout>
 
 Verified bots are never listed, at any stage. See [verified bots](/verified-bots) for how that allowlist works.
@@ -81,7 +104,7 @@ Botect pushes deltas — added and removed IPs — rather than rewriting the lis
 
 Every sync also reconciles drift: it re-reads what is actually in Cloudflare and corrects out-of-band edits, so a list someone emptied by hand repopulates on the next run.
 
-Cloudflare caps custom-list items account-wide (10,000 on non-Enterprise plans). If your denial list exceeds the cap, the sync status reads **capped** and block entries are kept first — the highest-confidence IPs, ordered deterministically so the retained subset is stable between syncs rather than an arbitrary slice.
+Cloudflare caps custom-list items account-wide (10,000 on non-Enterprise plans). If your blocklist exceeds the cap, the sync status reads **capped** and block entries are kept first — the highest-confidence IPs, ordered deterministically so the retained subset is stable between syncs rather than an arbitrary slice.
 
 ## The WAF rules
 
@@ -136,7 +159,7 @@ Both are best-effort and never block the disconnect. Anything that could not be 
 
 ## Self-hosting the list
 
-If you enforce somewhere other than Cloudflare, the denial list is available over the API and you can mirror it into any WAF, CDN, or firewall:
+If you enforce somewhere other than Cloudflare, the blocklist is available over the API and you can mirror it into any WAF, CDN, or firewall:
 
 ```bash
 curl https://www.botect.ai/api/v1/blocklist \
