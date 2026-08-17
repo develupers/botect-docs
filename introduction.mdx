@@ -8,7 +8,7 @@ Botect is a bot-detection API. A lightweight browser SDK streams privacy-safe in
 There are two halves to the API:
 
 - **The data plane** — high-volume, latency-critical, and never rate-limited. Your SDK posts signals to [`POST /v1/events`](/endpoints/events); your backend reads decisions from [`GET /v1/sessions/{token}/verdict`](/endpoints/verdict).
-- **The control plane** — owner-facing configuration. Enable scoring on a project, tune toggles and the bot threshold, and compose custom rules.
+- **The control plane** — owner-facing configuration. Enable scoring on a project, tune the guards and the bot threshold, and compose the rules that decide enforcement.
 
 ## Key features
 
@@ -58,7 +58,7 @@ There are two halves to the API:
   </Step>
 
   <Step title="Decide" icon="check" title-type="p">
-    Toggles and your custom rules resolve the action. Unknown or not-yet-scored sessions fail open to <code>allow</code>.
+    Your active rules resolve the action. Unknown or not-yet-scored sessions fail open to <code>allow</code>.
   </Step>
 </Steps>
 

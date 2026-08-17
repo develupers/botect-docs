@@ -95,7 +95,7 @@ v = r.json()
 </ResponseField>
 
 <ResponseField name="action" field-type="string" required="true">
-  What to do: `allow`, `challenge`, `block`, `log`, or `delay`. Resolved from rules + toggles. **Branch on this**, not on `score`.
+  What to do: `allow`, `challenge`, `block`, `log`, or `delay`. Resolved from your active [rules](/rules). **Branch on this**, not on `score`.
 </ResponseField>
 
 <ResponseField name="detection_ids" field-type="integer[]" required="true">
@@ -108,7 +108,7 @@ v = r.json()
 
 ## Caching & fail-open
 
-- Cached per `project` + `session_token` (default TTL 60s). The cache is busted on rescore and whenever a toggle or rule changes.
+- Cached per `project` + `session_token` + request context (default TTL 60s). A configuration change applies to verdicts computed after it; an already-cached verdict is served until it expires.
 - An **unknown / not-yet-scored session, or any load error, returns the fail-open `200` body** (`not_computed`, score `0`, action `allow`). Your site continues to serve traffic even if Botect is degraded.
 - A blocking resolution records a block (with score, reason, and detection IDs) for audit.
 

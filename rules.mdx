@@ -1,11 +1,22 @@
 ---
 title: "Rules"
-description: "Go beyond toggles with a safe, composable boolean grammar over every signal field — compiled to an AST, never eval'd."
+description: "The single place enforcement is decided — a safe, composable boolean grammar over every signal field, compiled to an AST and never eval'd."
 ---
 
-Toggles cover the common case. **Rules** cover the rest: when you want a decision to depend on a specific path, country, detection ID, or behavioral threshold, you write a rule. A rule is a boolean expression over [signal fields](/signals) plus an action to take when it matches.
+**Rules are the only place Botect decides to block or challenge.** A rule is a boolean expression over [signal fields](/signals) plus an action to take when it matches. They cover everything from the simple case (act on a [score band](/score-bands)) to a decision that depends on a specific path, country, detection ID, or behavioral threshold.
 
-Rules are evaluated **before** toggles in the [resolution order](/score-bands#resolution-order): the first active rule that matches and carries a terminating action (`block`/`challenge`) wins, and its name appears in the verdict `reason`.
+In the [resolution order](/score-bands#resolution-order) rules run after the two guards (`allow_verified`, `protect_static`) and are the last word: the first active rule that matches and carries a terminating action wins, and its name appears in the verdict `reason`.
+
+## Starter rules
+
+Every project is provisioned with two rules covering the enforceable bands. They ship **inactive** — Botect never starts blocking real traffic on your behalf — so turning one on is the normal way to begin enforcing.
+
+| Name | Expression | Action |
+|---|---|---|
+| Block confirmed automation | `band == "definite"` | `block` |
+| Challenge likely-automated traffic | `band == "likely_automated"` | `challenge` |
+
+Activating a rule also feeds [edge enforcement](/cloudflare-enforcement): a rule whose expression reads **only** `band` can be honored by an IP list, so its matching IPs are synced to Cloudflare. A rule that reads `path`, `country`, `ua` or `score` cannot — an IP list is request-blind — so it applies at the verdict API only.
 
 ## Safety
 
@@ -74,12 +85,18 @@ curl -X POST https://api.botect.ai/v1/projects/123/rules \
 
 See [Create a rule](/endpoints/rules-create) for the full request and response. Rules are listed in `sort_order` (ascending) and evaluated in that order.
 
+<Callout kind="warning">
+  Order decides precedence. A narrow exemption only overrides a broad rule if it sits **above** it — give your `allow` rules a lower <code>sort_order</code> than the band rules they are meant to pre-empt. The starter rules sit at <code>10</code> and <code>20</code>.
+</Callout>
+
 <Callout kind="tip">
   Always guard enforcement rules with <code>AND NOT verified_bot</code> unless you specifically intend to act on verified crawlers — otherwise a misconfigured rule could block Google or an AI crawler you want indexing your site.
 </Callout>
 
 ## Evaluation
 
-When a verdict is read, active rules run in `sort_order`. The first rule whose expression matches and whose action is **terminating** (`block`/`challenge`) wins; `log`/`delay`/`allow` actions follow their own semantics and may not stop evaluation. The matched rule populates the verdict `reason` (and the recorded block) so you can always trace *why* a request was acted on.
+When a verdict is read, active rules run in `sort_order`. Every action **terminates** evaluation with that action as the verdict — `allow` and `delay` included — except `log`, which records the match and lets evaluation continue so a later `block` or `challenge` still applies. If no rule matches, the verdict is `allow`.
 
-Changing a rule busts the project's verdict cache so it takes effect within the cache window.
+The matched rule populates the verdict `reason` and is recorded on the block itself, so you can always trace *why* a request was acted on.
+
+Rule changes apply to verdicts computed from then on. A verdict already cached for a session is served until it expires, so allow up to the verdict cache TTL (60s by default) for a change to be visible everywhere.

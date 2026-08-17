@@ -83,6 +83,7 @@
               { "title": "Update settings", "path": "endpoints/scoring-settings", "icon": "toggle-right" },
               { "title": "List rules", "path": "endpoints/rules-list", "icon": "list" },
               { "title": "Create a rule", "path": "endpoints/rules-create", "icon": "plus" },
+              { "title": "Update a rule", "path": "endpoints/rules-update", "icon": "pencil" },
               { "title": "Delete a rule", "path": "endpoints/rules-delete", "icon": "trash" }
             ]
           },

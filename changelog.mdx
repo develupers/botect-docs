@@ -7,6 +7,26 @@ description: "What's new in the Botect API — features, behavior changes, and i
   Subscribe to changes by watching the [`botect-docs`](https://gitlab.com/develupers/botect-docs) repo. Every release update lands here as a commit.
 </Callout>
 
+<Update label="2026-08-16" description="v1" tags={["Breaking change"]}>
+  ## Enforcement is decided by rules only
+
+  Botect had two places that could decide to block or challenge: your [rules](/rules), and a pair of enforcement toggles on the project settings. They overlapped exactly — each toggle duplicated a rule shipped with every project — but had different reach, since the [Cloudflare blocklist](/cloudflare-enforcement) is built from active rules and never saw the toggles. Rules are now the single decision point.
+
+  **Removed:** `block_definite` and `challenge_likely`.
+
+  - `PUT /v1/projects/{project}/scoring/settings` rejects both fields with `422`. They are not translated silently — a settings write should never conjure a rule you did not ask for.
+  - `bot_settings` in every response now carries `allow_verified` and `protect_static` only. Both are **guards**: they decide who skips checking, and they still run before rules.
+  - `likely_bot_threshold` is unchanged — it defines the bands themselves.
+
+  **What to do instead:** [activate](/endpoints/rules-update) the starter rule that matches — `band == "definite"` → `block`, or `band == "likely_automated"` → `challenge`. Both ship with every project, inactive. Or [create your own rule](/endpoints/rules-create) to act on a path, country or detection instead of a whole band.
+
+  **Also new:** `PATCH /v1/projects/{project}/rules/{rule}` — the API could previously create and delete rules but not change one, so there was no way to activate a starter rule outside the dashboard. See [Update a rule](/endpoints/rules-update).
+
+  The [resolution order](/score-bands#resolution-order) is now: verified short-circuit → static skip → rules → allow. Because rules are evaluated in `sort_order` and the first terminating match wins, an `allow` rule placed above a band rule now overrides it — the toggles used to run last, after every rule.
+
+  Blocks recorded by the verdict API carry `source: "rule"` and the id of the rule that caused them.
+</Update>
+
 <Update label="2026-06-15" description="v1" tags={["New endpoint"]}>
   ## Export the verified-bot allowlist
 
@@ -46,7 +66,7 @@ description: "What's new in the Botect API — features, behavior changes, and i
 
   - **Observe-first** — `block_definite` and `challenge_likely` start off, so enabling scoring never breaks legitimate traffic
   - Likely-bot threshold `T = 30`
-  - Verdict cache TTL 60s, busted on rescore and on any toggle/rule change
+  - Verdict cache TTL 60s — a configuration change applies to verdicts computed after it, and already-cached verdicts expire within the TTL
 
   See [How scoring works](/how-scoring-works) for the engine model and [Plans & quotas](/plans-quotas) for how ingest volume is metered.
 </Update>

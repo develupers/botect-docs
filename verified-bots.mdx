@@ -16,21 +16,21 @@ A session is marked `verified_bot` only on **actual verification** — never on 
 
 ## Allowing verified bots
 
-The `allow_verified` toggle is **on by default**. With it on, any verified bot resolves to `allow` as the very first step of [verdict resolution](/score-bands#resolution-order) — before rules and other toggles. This is almost always what you want.
+The `allow_verified` toggle is **on by default**. With it on, any verified bot resolves to `allow` as the very first step of [verdict resolution](/score-bands#resolution-order) — before any rule is evaluated. This is almost always what you want.
 
 ```json
 { "allow_verified": true }
 ```
 
 <Callout kind="info">
-  Verified-bot handling runs <strong>first</strong>. A <code>block_definite</code> toggle or a low-score rule won't catch a verified crawler while <code>allow_verified</code> is on.
+  Verified-bot handling runs <strong>first</strong>. No rule catches a verified crawler while <code>allow_verified</code> is on — not a <code>band == "definite"</code> rule, not a low-score one.
 </Callout>
 
 ## Acting on verified bots
 
 If you *do* want to treat some verified bots differently — say, challenge AI crawlers on a paid section — you have two levers:
 
-- Turn `allow_verified` **off** to stop the blanket short-circuit, then let rules and toggles decide.
+- Turn `allow_verified` **off** to stop the blanket short-circuit, then let your rules decide.
 - Write a [rule](/rules) that matches on `verified_bot` / `verified_bot_category`:
 
 ```text

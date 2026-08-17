@@ -1,0 +1,126 @@
+---
+title: "PATCH /v1/projects/{project}/rules/{rule}"
+description: "Update a custom bot rule — rename it, change its expression or action, reorder it, or activate it."
+---
+
+Partially updates a [rule](/rules). Every field is optional; send only what you want to change.
+
+This is also how you **turn enforcement on** from the API: every project ships with two starter rules covering the enforceable bands, both inactive, and `{"is_active": true}` activates one.
+
+```http
+PATCH https://api.botect.ai/v1/projects/{project}/rules/{rule}
+```
+
+`PUT` is accepted as an alias; the semantics are the same partial update either way.
+
+## Authentication
+
+Account API token via `Authorization: Bearer <token>`. The project must belong to the token's account, and the rule must belong to the project. See [Authentication](/authentication).
+
+## Path parameters
+
+<ParamField path="project" param-type="integer" required="true">
+  The project ID.
+</ParamField>
+
+<ParamField path="rule" param-type="integer" required="true">
+  The rule ID to update.
+</ParamField>
+
+## Body
+
+<ParamField body="name" param-type="string">
+  Display name, max 255 characters. Appears in the verdict `reason` and on recorded blocks.
+</ParamField>
+
+<ParamField body="expression" param-type="string">
+  The rule expression, max 2000 characters. Recompiled and validated on save — an out-of-grammar expression is rejected with `422` and the stored rule is left untouched. See [Rules](/rules#grammar).
+</ParamField>
+
+<ParamField body="action" param-type="string">
+  One of `allow`, `challenge`, `block`, `log`, `delay`.
+</ParamField>
+
+<ParamField body="is_active" param-type="boolean">
+  Whether the rule is evaluated. Inactive rules are stored but never matched.
+</ParamField>
+
+<ParamField body="sort_order" param-type="integer">
+  Evaluation order, ascending. The first active rule that matches with a terminating action wins, so a lower `sort_order` takes precedence.
+</ParamField>
+
+## Example
+
+Activating a starter rule — [list the project's rules](/endpoints/rules-list) first to find its id:
+
+<Request show-lines="true" tabs="cURL,JavaScript,Python">
+```bash
+curl -X PATCH https://api.botect.ai/v1/projects/123/rules/7 \
+  -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "is_active": true }'
+```
+
+```javascript
+const res = await fetch('https://api.botect.ai/v1/projects/123/rules/7', {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${process.env.BOTECT_TOKEN}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ is_active: true }),
+});
+const rule = await res.json();
+```
+
+```python
+import os, requests
+
+r = requests.patch(
+    "https://api.botect.ai/v1/projects/123/rules/7",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
+    json={"is_active": True},
+)
+rule = r.json()
+```
+</Request>
+
+<Response show-lines="true" tabs="200,422 bad expression">
+```json
+{
+  "id": 7,
+  "project_id": 123,
+  "name": "Block confirmed automation",
+  "expression": { "type": "cmp", "op": "==", "field": "band", "value": "definite" },
+  "expression_source": "band == \"definite\"",
+  "action": "block",
+  "is_active": true,
+  "sort_order": 10,
+  "created_at": "2026-06-14T10:00:00Z",
+  "updated_at": "2026-08-16T09:30:00Z"
+}
+```
+
+```json
+{
+  "error": "Invalid payload",
+  "code": "INVALID_PAYLOAD",
+  "errors": {
+    "expression": ["Invalid rule expression: unknown field 'nonsense_field'"]
+  }
+}
+```
+</Response>
+
+The full updated rule is returned. Note the two `expression` fields are not the same thing: you **send** `expression` as the source string, and the response echoes it back as `expression_source` alongside `expression`, the compiled AST the verdict path walks. The AST is derived — it is regenerated on every source change and cannot be set directly.
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad account token |
+| `403` | — | Project does not belong to the token's account |
+| `404` | — | The rule does not exist or does not belong to the project |
+| `422` | `INVALID_PAYLOAD` | Invalid expression, unknown action, or a field of the wrong type |
+
+Changes apply to verdicts computed from then on; a verdict already cached for a session is served until it expires, so allow up to the verdict cache TTL (60s by default).

@@ -53,9 +53,7 @@ keys = r.json()
   "private_key": "sk_9aQ…",
   "bot_settings": {
     "allow_verified": true,
-    "protect_static": true,
-    "block_definite": false,
-    "challenge_likely": false
+    "protect_static": true
   },
   "likely_bot_threshold": 30
 }
@@ -67,9 +65,7 @@ keys = r.json()
   "private_key": null,
   "bot_settings": {
     "allow_verified": true,
-    "protect_static": true,
-    "block_definite": false,
-    "challenge_likely": false
+    "protect_static": true
   },
   "likely_bot_threshold": 30
 }
@@ -87,7 +83,7 @@ keys = r.json()
 </ResponseField>
 
 <ResponseField name="bot_settings" field-type="object" required="true">
-  The project's enforcement toggles (observe-first defaults). See [Score bands](/score-bands).
+  The project's pre-rule guards (`allow_verified`, `protect_static`). Enforcement lives in [rules](/rules), which ship inactive. See [Score bands](/score-bands).
 </ResponseField>
 
 <ResponseField name="likely_bot_threshold" field-type="integer" required="true">

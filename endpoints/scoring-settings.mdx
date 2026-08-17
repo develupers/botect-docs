@@ -1,9 +1,11 @@
 ---
 title: "PUT /v1/projects/{project}/scoring/settings"
-description: "Update a project's enforcement toggles and bot threshold. Changes bust the verdict cache so they take effect promptly."
+description: "Update a project's pre-rule guards and bot threshold. Changes bust the verdict cache so they take effect promptly."
 ---
 
-Updates the project's enforcement toggles and the likely-bot threshold. This is the **90% control surface** — most tuning happens here, without writing rules. Changes bust the verdict cache so they take effect within the cache window.
+Updates the project's **guards** — who is exempt from being checked — and the likely-bot threshold. Changes apply to verdicts computed from then on; a verdict already cached for a session is served until it expires, so allow up to the verdict cache TTL (60s by default).
+
+This endpoint does not configure enforcement. Blocking and challenging are decided entirely by [rules](/rules); see [Create a rule](/endpoints/rules-create).
 
 ```http
 PUT https://api.botect.ai/v1/projects/{project}/scoring/settings
@@ -24,24 +26,20 @@ Account API token via `Authorization: Bearer <token>`. The project must belong t
 All fields are optional — send only what you want to change.
 
 <ParamField body="allow_verified" param-type="boolean">
-  Verified bots → `allow`, regardless of score. Default `true`.
+  Verified bots → `allow`, regardless of score, before any rule is evaluated. Default `true`.
 </ParamField>
 
 <ParamField body="protect_static" param-type="boolean">
   When `false`, static-resource requests are skipped (`allow`). Default `true`.
 </ParamField>
 
-<ParamField body="block_definite" param-type="boolean">
-  When `true`, band `definite` → `block`. Default `false`.
-</ParamField>
-
-<ParamField body="challenge_likely" param-type="boolean">
-  When `true`, band `likely_automated` → `challenge`. Default `false`.
-</ParamField>
-
 <ParamField body="likely_bot_threshold" param-type="integer">
   The bot/human boundary `T`, `1`–`99`. Default `30`. Higher is more suspicious.
 </ParamField>
+
+<Callout kind="warning">
+  `block_definite` and `challenge_likely` were removed. Sending either returns `422` — they are not translated silently. Use a rule instead: [activate](/endpoints/rules-update) the starter rule that matches (<code>band == "definite"</code> → `block`, <code>band == "likely_automated"</code> → `challenge`), or [create your own](/endpoints/rules-create).
+</Callout>
 
 ## Example
 
@@ -51,8 +49,7 @@ curl -X PUT https://api.botect.ai/v1/projects/123/scoring/settings \
   -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "block_definite": true,
-    "challenge_likely": true,
+    "allow_verified": true,
     "likely_bot_threshold": 40
   }'
 ```
@@ -64,7 +61,7 @@ const res = await fetch('https://api.botect.ai/v1/projects/123/scoring/settings'
     Authorization: `Bearer ${process.env.BOTECT_TOKEN}`,
     'Content-Type': 'application/json',
   },
-  body: JSON.stringify({ block_definite: true, challenge_likely: true }),
+  body: JSON.stringify({ allow_verified: true, likely_bot_threshold: 40 }),
 });
 const settings = await res.json();
 ```
@@ -75,7 +72,7 @@ import os, requests
 r = requests.put(
     "https://api.botect.ai/v1/projects/123/scoring/settings",
     headers={"Authorization": f"Bearer {os.environ['BOTECT_TOKEN']}"},
-    json={"block_definite": True, "challenge_likely": True, "likely_bot_threshold": 40},
+    json={"allow_verified": True, "likely_bot_threshold": 40},
 )
 settings = r.json()
 ```
@@ -86,9 +83,7 @@ settings = r.json()
 {
   "bot_settings": {
     "allow_verified": true,
-    "protect_static": true,
-    "block_definite": true,
-    "challenge_likely": true
+    "protect_static": true
   },
   "likely_bot_threshold": 40
 }
@@ -98,7 +93,7 @@ settings = r.json()
 ## Response fields
 
 <ResponseField name="bot_settings" field-type="object" required="true">
-  The project's toggles after the update.
+  The project's guards after the update.
 </ResponseField>
 
 <ResponseField name="likely_bot_threshold" field-type="integer" required="true">
@@ -111,6 +106,6 @@ settings = r.json()
 |---|---|---|
 | `401` | `UNAUTHENTICATED` | Missing / bad account token |
 | `403` | — | Project does not belong to the token's account |
-| `422` | `INVALID_PAYLOAD` | A toggle is non-boolean or `likely_bot_threshold` is out of range |
+| `422` | `INVALID_PAYLOAD` | A guard is non-boolean, `likely_bot_threshold` is out of range, or a removed enforcement toggle was sent |
 
-See [Score bands](/score-bands) for how these settings drive the verdict action.
+See [Score bands](/score-bands) for how bands, guards and rules combine into the verdict action.

@@ -96,6 +96,7 @@ rule = r.json()
   "id": 7,
   "project_id": 123,
   "name": "Protect login from bots",
+  "expression": { "type": "and", "nodes": ["…compiled AST…"] },
   "expression_source": "score < 30 AND path == \"/login\" AND NOT verified_bot",
   "action": "block",
   "is_active": true,

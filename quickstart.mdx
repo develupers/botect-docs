@@ -112,19 +112,21 @@ A typical response:
 ```
 
 <Callout kind="tip">
-  Branch on `action`, not on `score`. The action already folds in your toggles, threshold, and rules — and an unknown or not-yet-scored session returns `action: "allow"` (fail-open) so your site never hard-breaks.
+  Branch on `action`, not on `score`. The action already folds in your guards, threshold, and rules — and an unknown or not-yet-scored session returns `action: "allow"` (fail-open) so your site never hard-breaks.
 </Callout>
 
 ## 4. Turn on enforcement when you're ready
 
-Botect ships **observe-first**: `block_definite` and `challenge_likely` are off by default, so enabling scoring never breaks legitimate traffic. Watch your sessions, then opt in:
+Botect ships **observe-first**. Every project comes with two [rules](/rules) covering the enforceable bands, and both arrive inactive, so enabling scoring never breaks legitimate traffic. Watch your sessions, then activate the one you want — [list the rules](/endpoints/rules-list) to find its id:
 
 ```bash
-curl -X PUT https://api.botect.ai/v1/projects/123/scoring/settings \
+curl -X PATCH https://api.botect.ai/v1/projects/123/rules/7 \
   -H "Authorization: Bearer YOUR_ACCOUNT_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{ "block_definite": true, "challenge_likely": true }'
+  -d '{ "is_active": true }'
 ```
+
+Or [create your own rule](/endpoints/rules-create) to act on a path, country, or detection instead of a whole band. Rules created through the API are active immediately unless you pass `"is_active": false`.
 
 ## Next steps
 
@@ -134,7 +136,7 @@ curl -X PUT https://api.botect.ai/v1/projects/123/scoring/settings \
   </Card>
 
   <Card title="Rules" href="/rules" icon="filter" horizontal="true">
-    Go beyond toggles with custom expressions.
+    Where every block and challenge is decided.
   </Card>
 
   <Card title="Plans & quotas" href="/plans-quotas" icon="layers" horizontal="true">
