@@ -45,3 +45,10 @@ The `behavioral.*` aggregates are Botect's core differentiator — they describe
 ## Privacy
 
 Ingest stores **no PII**. Event payloads are whitelisted per event type to aggregates only (entropy, velocities, counts, timings) — raw inputs, content, and identifying data are rejected at the door with a `422`. See [Ingest events](/endpoints/events).
+
+**Page identity.** The collector reports which page it ran on as a hash plus a normalized template, never a readable URL:
+
+- `page_path_hash` — a 16-character hash of the path. Identical paths hash identically, so repeat visits and sequential crawls are still detectable.
+- `page_path_shape` — the path with identifiers masked, so `/orders/48812` and `/orders/50193` both become `/orders/{n}`.
+
+The query string and fragment are never collected, so tokens and email addresses in a URL never leave the browser. Neither field is rule-usable; use the `path` field (supplied by your own edge at verdict time) to write path rules.

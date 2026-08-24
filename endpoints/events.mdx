@@ -38,7 +38,9 @@ Idempotency-Key: 6f1c…batch-uuid
       A UUID unique to this event. Used to de-duplicate within the session.
     </ParamField>
     <ParamField body="type" param-type="string" required="true">
-      One of `mouse`, `scroll`, `visibility`, `first_input`, `js_probe`, `page`.
+      One of `snapshot`, `mouse`, `scroll`, `visibility`, `first_input`, `js_probe`, `page`.
+
+      `snapshot` (collector v1.3.0+) carries the complete behavioural picture and is sent on every flush, with every field present — including zeros. The four per-type behavioural events are the earlier shape and remain accepted indefinitely.
     </ParamField>
     <ParamField body="received_at" param-type="string (ISO 8601)" required="true">
       When the event was observed client-side.
