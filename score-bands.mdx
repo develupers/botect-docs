@@ -10,9 +10,10 @@ A raw score is precise but hard to act on. Botect classifies each score into a *
 | Band | Score range | Meaning |
 |---|---|---|
 | `not_computed` | `0` | No signals yet, or a degraded lookup. Always allowed (fail-open). |
-| `definite` | `1` | Strongest bot evidence. |
-| `likely_automated` | `2` … `T-1` | Below the threshold — probably a bot. |
-| `likely_human` | `T` … `99` | At or above the threshold — probably human. |
+| `definite` | `1` | The browser or request **admitted** automation (e.g. `navigator.webdriver`). Never assigned by inference. |
+| `confident_automated` | `2` … `5` | Overwhelming *accumulated* evidence — as certain as inference gets, without an admission. Target this band for block-level rules if you want strict enforcement; keep blocking only `definite` if you want the most cautious posture. |
+| `likely_automated` | `6` … `T-1` | Below the threshold — probably a bot. |
+| `likely_human` | `T` … `99` | At or above the threshold — probably human. **Earned**: this band requires at least one positive human signal (touch, typing, a return visit). A session whose evidence all leans bot can never drift into it on arithmetic alone — it reads `not_computed` instead. |
 | `verified` | — | A recognized [verified bot](/verified-bots); set by short-circuit, independent of score. |
 
 The threshold `T` (default `30`) is a project setting. Raising it makes Botect more suspicious (more sessions land in `likely_automated`); lowering it is more permissive.
