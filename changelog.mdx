@@ -7,6 +7,22 @@ description: "What's new in the Botect API — features, behavior changes, and i
   Subscribe to changes by watching the [`botect-docs`](https://gitlab.com/develupers/botect-docs) repo. Every release update lands here as a commit.
 </Callout>
 
+<Update label="2026-09-01" description="v1" tags={["New endpoint"]}>
+  ## Tell Botect when a visitor signs in
+
+  - `POST /v1/sessions/{session_token}/logged-in` — assert, from your server, that a session authenticated in your application. See [Assert logged in](/endpoints/sessions-logged-in).
+
+  Botect stores **a timestamp and nothing else**. The endpoint accepts no request body and no query string, so a user id or email cannot reach it even by accident — we learn *that* a session signed in, never *who* did.
+
+  **What it buys.** A new per-project setting, `logged_in_policy`, decides what an assertion is worth at enforcement time: `observe` (the default — record only), `never_block`, `never_challenge`, or `whitelist`. No policy shelters the `definite` or `confident_automated` bands: a credential-stuffing bot logs in by definition, so hard evidence outranks the claim. At the Cloudflare edge the assertion moves an address from the block list to the **challenge** list rather than removing it, since one login must not unblock everyone behind a shared address.
+
+  **Assert on every login.** The window is 24 hours from the most recent call, and re-asserting restarts it. Repeats are idempotent and free. The session token lives in browser storage and outlives a logout, so an assertion that never expired would be a transferable pass.
+
+  **Why we want it.** Scoring weights are learned by comparing bot traffic against human traffic, and our stand-in for "human" has always been behavioral — which cannot measure the worth of behavioral signals without measuring itself. An authenticated session is a human label that owes nothing to observed behavior, so it breaks that circle and lets us count our own false positives for the first time. The assertion does not move a score today and no rule can read it; it will earn a weight only after it has been measured.
+
+  See [Logged-in visitors](/logged-in-visitors).
+</Update>
+
 <Update label="2026-08-16" description="v1" tags={["Breaking change"]}>
   ## Enforcement is decided by rules only
 

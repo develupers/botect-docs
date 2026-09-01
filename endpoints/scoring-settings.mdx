@@ -33,6 +33,10 @@ All fields are optional — send only what you want to change.
   When `false`, static-resource requests are skipped (`allow`). Default `true`.
 </ParamField>
 
+<ParamField body="logged_in_policy" param-type="string">
+  What a [logged-in assertion](/logged-in-visitors) buys at enforcement time: `observe` (default), `never_block`, `never_challenge`, or `whitelist`. No value shelters the `definite` or `confident_automated` bands.
+</ParamField>
+
 <ParamField body="likely_bot_threshold" param-type="integer">
   The bot/human boundary `T`, `1`–`99`. Default `30`. Higher is more suspicious.
 </ParamField>
@@ -83,7 +87,8 @@ settings = r.json()
 {
   "bot_settings": {
     "allow_verified": true,
-    "protect_static": true
+    "protect_static": true,
+    "logged_in_policy": "observe"
   },
   "likely_bot_threshold": 40
 }

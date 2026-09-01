@@ -37,7 +37,8 @@
               { "title": "Signals & fields", "path": "signals", "icon": "radar" },
               { "title": "Score bands", "path": "score-bands", "icon": "gauge" },
               { "title": "Rules", "path": "rules", "icon": "filter" },
-              { "title": "Verified bots", "path": "verified-bots", "icon": "circle-check" }
+              { "title": "Verified bots", "path": "verified-bots", "icon": "circle-check" },
+              { "title": "Logged-in visitors", "path": "logged-in-visitors", "icon": "user-check" }
             ]
           },
           {
@@ -70,7 +71,8 @@
             "expandable": false,
             "pages": [
               { "title": "Ingest events", "path": "endpoints/events", "icon": "upload" },
-              { "title": "Get verdict", "path": "endpoints/verdict", "icon": "shield-check" }
+              { "title": "Get verdict", "path": "endpoints/verdict", "icon": "shield-check" },
+              { "title": "Assert logged in", "path": "endpoints/sessions-logged-in", "icon": "user-check" }
             ]
           },
           {

@@ -64,6 +64,7 @@ When your backend reads a verdict, the action is resolved in this order — the 
   </Step>
   <Step title="Rules" icon="filter" title-type="p">
     Active <a href="/rules">rules</a> in <code>sort_order</code>. Every action except <code>log</code> terminates — <code>allow</code> and <code>delay</code> end evaluation just as <code>block</code> and <code>challenge</code> do — so the first match wins. <code>log</code> records the match and keeps going.
+    <br />If the session carries a <a href="/logged-in-visitors">logged-in assertion</a> and the project sets a protective policy, the matched action may be downgraded here — never for the <code>definite</code> or <code>confident_automated</code> bands.
   </Step>
   <Step title="Default" icon="check" title-type="p">
     <code>allow</code>.

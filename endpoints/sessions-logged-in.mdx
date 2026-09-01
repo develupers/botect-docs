@@ -1,0 +1,128 @@
+---
+title: "POST /v1/sessions/{session_token}/logged-in"
+description: "Assert that a session's visitor authenticated in your application. Private-key authenticated, body-less by design, idempotent."
+---
+
+Call this from your login handler after a successful sign-in. Authenticated by the **private key** (secret), like the [verdict](/endpoints/verdict) endpoint, and against the same session token.
+
+```http
+POST https://api.botect.ai/v1/sessions/{session_token}/logged-in
+```
+
+Botect records **a timestamp and nothing else** — see [Logged-in visitors](/logged-in-visitors) for what the assertion buys and how long it lasts.
+
+## Authentication
+
+Private key via `Authorization: Bearer sk_…` (or the `X-Botect-Private-Key` header). The session must belong to the authenticated project. See [Authentication](/authentication).
+
+```http
+Authorization: Bearer sk_YOUR_PRIVATE_KEY
+```
+
+<Callout kind="alert">
+  Server-side only. Calling this from the browser would let any script — including the automation you are paying to detect — claim to be signed in.
+</Callout>
+
+## Path parameters
+
+<ParamField path="session_token" param-type="string" required="true">
+  The session token your SDK obtained from [ingest](/endpoints/events) — the same one you pass to the verdict endpoint.
+</ParamField>
+
+## Request body
+
+**None.** This endpoint rejects any request body and any query string with a `422`.
+
+That is the privacy guarantee made structural: there is no field in which a user id, email, or account reference could reach Botect, so none can arrive by mistake. An empty JSON container (`{}`) is tolerated, since many HTTP clients send one on a body-less `POST`.
+
+## Example
+
+<Request show-lines="true" tabs="cURL,Laravel,Node,Python">
+```bash
+curl -X POST \
+  https://api.botect.ai/v1/sessions/sess_9f3c.../logged-in \
+  -H "Authorization: Bearer sk_YOUR_PRIVATE_KEY"
+```
+
+```php
+Http::withToken(env('BOTECT_PRIVATE_KEY'))
+    ->post('https://api.botect.ai/v1/sessions/'.$sessionToken.'/logged-in');
+```
+
+```javascript
+await fetch(
+  `https://api.botect.ai/v1/sessions/${sessionToken}/logged-in`,
+  {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.BOTECT_PRIVATE_KEY}` },
+  },
+);
+```
+
+```python
+import os, requests
+
+requests.post(
+    f"https://api.botect.ai/v1/sessions/{session_token}/logged-in",
+    headers={"Authorization": f"Bearer {os.environ['BOTECT_PRIVATE_KEY']}"},
+)
+```
+</Request>
+
+<Response show-lines="true" tabs="200,404,422">
+```json
+{
+  "logged_in": true,
+  "asserted_at": "2026-09-01T10:15:00Z"
+}
+```
+
+```json
+{
+  "error": "Unknown session",
+  "message": "No session with that token exists for this project. Sessions are minted when the collector first reports (about half a second after page load) — assert after the SDK has run, and retry if the login raced it.",
+  "code": "UNKNOWN_SESSION"
+}
+```
+
+```json
+{
+  "error": "Invalid payload",
+  "message": "This endpoint accepts no request body or query parameters. Botect stores a timestamp only — never user identifiers.",
+  "code": "INVALID_PAYLOAD"
+}
+```
+</Response>
+
+## Response fields
+
+<ResponseField name="logged_in" field-type="boolean" required="true">
+  Always `true` on success — the assertion is recorded.
+</ResponseField>
+
+<ResponseField name="asserted_at" field-type="string" required="true">
+  ISO-8601 timestamp of the **current** assertion, which is what the protection window is measured from. Expiry is this value plus 24 hours, so you can compute it directly from the response.
+</ResponseField>
+
+## Idempotency
+
+Repeats are safe and expected — call this on **every** login, not just the first. Each call restarts the 24-hour window and returns the new `asserted_at`.
+
+No idempotency key is needed: the operation is a timestamp write, so replaying it is indistinguishable from asserting again.
+
+## Errors
+
+| Status | `code` | When |
+|---|---|---|
+| `401` | `UNAUTHENTICATED` | Missing / bad private key, or scoring not enabled |
+| `402` | `NO_ACTIVE_SUBSCRIPTION` | Owning account has no active subscription |
+| `404` | `UNKNOWN_SESSION` | No such session for this project |
+| `422` | `INVALID_PAYLOAD` | A request body, a query string, or a malformed session token |
+
+<Callout kind="info">
+  Unlike the verdict endpoint — a read that <a href="/errors#what-is-not-an-error">fails open</a> — this is a <strong>write</strong>, so an assertion that did not land says so with a <code>404</code> rather than a cheerful <code>200</code>. A token belonging to another project returns the same <code>404</code> as one that does not exist, so the endpoint never reveals which tokens are real.
+</Callout>
+
+<Callout kind="tip">
+  A <code>404</code> most often means the login beat the collector: the session row is created by the SDK's first report, roughly half a second after page load. Retry once, or assert after the visitor's first navigation.
+</Callout>

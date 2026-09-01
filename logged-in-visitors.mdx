@@ -1,0 +1,108 @@
+---
+title: "Logged-in visitors"
+description: "Tell Botect when a visitor has authenticated in your application — to protect real customers from enforcement, and to sharpen scoring on your traffic."
+---
+
+When someone signs in to your application, you know something about them that Botect cannot see from the browser: a real account holder is at the keyboard. Telling us turns that into two things — protection for your signed-in customers, and the first non-circular human label our scoring has ever had.
+
+The assertion is **server-to-server**. Your backend calls one endpoint after a successful login; nothing changes in the browser SDK.
+
+## What Botect stores
+
+A timestamp. Nothing else.
+
+The endpoint **accepts no request body and no query string** — send one and you get a `422`. That is deliberate: it makes the privacy promise structural rather than a policy we ask you to trust. There is no field for a user id, an email, an account reference, or a plan tier, so none can arrive here by accident.
+
+<Callout kind="info">
+  Botect learns <strong>that</strong> a session authenticated, never <strong>who</strong> it was. The same posture as the rest of the pipeline, which hashes the user agent and never collects a query string. See <a href="/signals#privacy">Signals &amp; fields</a>.
+</Callout>
+
+## Making the assertion
+
+Call this from your login handler, using the **private key** — the same credential your middleware already uses to read verdicts, and the same session token you already forward to it.
+
+<CodeGroup tabs="cURL,Laravel,Node">
+```bash
+curl -X POST \
+  https://api.botect.ai/v1/sessions/$SESSION_TOKEN/logged-in \
+  -H "Authorization: Bearer $BOTECT_PRIVATE_KEY"
+```
+
+```php
+// On every successful login.
+Http::withToken(env('BOTECT_PRIVATE_KEY'))
+    ->post('https://api.botect.ai/v1/sessions/'.$sessionToken.'/logged-in');
+```
+
+```javascript
+// On every successful login.
+await fetch(
+  `https://api.botect.ai/v1/sessions/${sessionToken}/logged-in`,
+  {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.BOTECT_PRIVATE_KEY}` },
+  },
+);
+```
+</CodeGroup>
+
+<Callout kind="alert">
+  Never call this from the browser. It would mean a script could claim to be logged in, which is exactly the assertion's value — a bot executes JavaScript just as happily as your real customers do. The private key belongs on your server and nowhere else.
+</Callout>
+
+See [POST /v1/sessions/{session_token}/logged-in](/endpoints/sessions-logged-in) for the full contract.
+
+## Assert on every login, not just the first
+
+The assertion **expires 24 hours** after the most recent call, and re-asserting restarts that window. Repeats are idempotent and free, so the right integration is one line in your login handler that fires every time — not a one-shot on first sign-up.
+
+Two reasons it expires at all. The session token lives in the browser's `localStorage`, survives logout, and can be lifted — an assertion that never expired would be a permanent, transferable pass for whoever ends up holding that token. And Botect cannot see your logins: this endpoint is the only signal, so "still signed in" has to be re-stated to stay true.
+
+<Callout kind="tip">
+  If you assert only once and a visitor stays signed in for a week, their protection lapses after day one — with nothing in the dashboard to explain why. Call it on every login.
+</Callout>
+
+The window is measured per **session**, not per IP or per user. A visitor on a second device, or one who cleared their browser storage, is a different session and needs its own assertion.
+
+## Choosing what it buys
+
+Set the policy per project in **Scoring settings → Protection**. It ships as `observe`, so turning the assertion on never changes enforcement until you decide it should.
+
+| Policy | Effect on a logged-in session |
+|---|---|
+| `observe` | Nothing. The assertion is recorded and reported, enforcement is unchanged. |
+| `never_block` | A rule that would block downgrades to a challenge. |
+| `never_challenge` | A rule that would block or challenge downgrades to allow. |
+| `whitelist` | Blocks and challenges both become allows. |
+
+`never_challenge` and `whitelist` have the same enforcement effect today; they are kept distinct because `whitelist` describes intent and will diverge as more actions are added. Under every policy your [`log` rules still fire](/rules), the stored score and band are untouched, and only the returned `action` changes — a downgraded verdict still tells you honestly what the visitor looked like.
+
+## What no policy can do
+
+**No policy shelters the `definite` or `confident_automated` bands.** Those are scores of 1–5: self-declared automation, or evidence stacked so far that a mistake is implausible. The assertion is a *claim* — a credential-stuffing bot logs in successfully by definition, and a stolen private key can assert anything — so hard evidence outranks it. A compromised account being driven by a headless browser gets no shelter.
+
+This is the same principle the scoring side applies: an automated session that also carries an assertion stays labelled as automation, and the mismatch is reported rather than absorbed.
+
+## At the Cloudflare edge
+
+The [denial list](/cloudflare-enforcement) is a list of IP addresses. It cannot see a session, so it applies the policy more coarsely: an address with any current logged-in session is moved from the block list to the **challenge** list — never dropped from the list entirely.
+
+That is deliberate. Removing the address outright would let one login unblock every other visitor behind it, which is a cheap bypass for anything sharing an office NAT, a VPN exit, or a carrier gateway. A managed challenge passes real people through; per-visitor precision lives at the verdict API, where the session is actually identifiable.
+
+## Sharper scoring on your traffic
+
+The second reason to send this is measurement, and it is the one we care about most.
+
+To learn what any signal is worth, Botect compares how often it appears on bot traffic against human traffic. Our stand-in for "human" has always been behavioral — *did this session move a pointer or tap the screen?* — which cannot be used to measure the worth of pointer and tap signals without measuring itself. Several signals sit at zero weight for exactly that reason.
+
+An authenticated session breaks that circle. It is a human label that owes nothing to observed behavior, which makes the behavioral signals measurable for the first time. Projects that send assertions get weights fitted against their own traffic instead of a proxy.
+
+It also lets us count our own false positives. A session scored as automation that later authenticates is, by definition, a scoring failure — and until now there was no way to see one.
+
+<Callout kind="info">
+  This is <strong>measurement only</strong>. The assertion does not currently move a score, and no rule can read it. It will earn a scoring weight the same way every other signal does: after it has been measured, never before.
+</Callout>
+
+## Propagation
+
+Settings and assertions reach enforcement within about 60 seconds — verdicts and the denial list are both cached briefly. A login asserted right now may not affect a verdict read in the same instant.

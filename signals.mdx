@@ -51,4 +51,6 @@ Ingest stores **no PII**. Event payloads are whitelisted per event type to aggre
 - `page_path_hash` — a 16-character hash of the path. Identical paths hash identically, so repeat visits and sequential crawls are still detectable.
 - `page_path_shape` — the path with identifiers masked, so `/orders/48812` and `/orders/50193` both become `/orders/{n}`.
 
-The query string and fragment are never collected, so tokens and email addresses in a URL never leave the browser. Neither field is rule-usable; use the `path` field (supplied by your own edge at verdict time) to write path rules.
+The query string and fragment are never collected, so tokens and email addresses in a URL never leave the browser.
+
+**Logged-in visitors.** If you tell Botect that a session has [authenticated in your application](/logged-in-visitors), we store a timestamp and nothing else. That endpoint accepts no request body and no query string at all, so a user id or email cannot reach it even by mistake — Botect learns *that* a session signed in, never *who* did. Neither field is rule-usable; use the `path` field (supplied by your own edge at verdict time) to write path rules.

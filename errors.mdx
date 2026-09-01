@@ -27,6 +27,7 @@ Every API error returns a stable JSON shape so your client can switch on the mac
 | `402` | `NO_ACTIVE_SUBSCRIPTION` | Valid credential, but the owning account has no active subscription |
 | `403` | `FEATURE_NOT_AVAILABLE` | The account's plan does not include the requested feature |
 | `403` | `INSUFFICIENT_TOKEN_ABILITY` | The account token lacks an ability the endpoint requires (e.g. `projects:read`) |
+| `404` | `UNKNOWN_SESSION` | The session token names no session on the authenticated project ([assert logged in](/endpoints/sessions-logged-in) only) |
 | `422` | `INVALID_PAYLOAD` | Schema violation â€” malformed batch, non-whitelisted payload keys, or an invalid rule expression |
 
 ## Canonical 402
@@ -59,6 +60,10 @@ Two cases that might look like failures are deliberately successful responses â€
 
 <Callout kind="info">
   <strong>Over-quota ingest.</strong> Crossing your monthly quota does not error. The batch is accepted (<code>202</code>) and may carry <code>"over_quota": true</code>. See <a href="/plans-quotas">Plans &amp; quotas</a>.
+</Callout>
+
+<Callout kind="info">
+  <strong>A write says so when it fails.</strong> The <code>404 UNKNOWN_SESSION</code> above is the one place a session lookup is not fail-open, and the difference is deliberate: reading a verdict is advisory, so it degrades to <code>allow</code>, but <a href="/endpoints/sessions-logged-in">asserting a login</a> changes stored state and has to tell you when it did not land. A token from another project returns the same <code>404</code> as one that does not exist, so neither response reveals which tokens are real.
 </Callout>
 
 ## No 429
